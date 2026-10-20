@@ -405,7 +405,13 @@ fun AppNavigation(
                         cacheDir = torrentEngine.storageDir,
                         onClearAllCache = {
                             scope.launch(Dispatchers.IO) {
+                                withContext(Dispatchers.Main) {
+                                    playerController.stop()
+                                }
                                 torrentEngine.clearAllCache()
+                                try {
+                                    torrentEngine.context.cacheDir.deleteRecursively()
+                                } catch (_: Exception) {}
                                 database.bookDao().resetAllDownloadFlags()
                             }
                         },

@@ -202,6 +202,14 @@ class AudioPlayerController(
         }
     }
 
+    fun stop() {
+        exoPlayer.stop()
+        _playerState.value = _playerState.value.copy(
+            isPlaying = false,
+            currentInfoHash = null
+        )
+    }
+
     fun seekTo(positionMs: Long) {
         val target = positionMs.coerceIn(0L, maxOf(0L, exoPlayer.duration))
         exoPlayer.seekTo(target)

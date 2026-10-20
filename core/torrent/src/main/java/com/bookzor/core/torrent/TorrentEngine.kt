@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class TorrentEngine(
-    private val context: Context
+    val context: Context
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val sessionManager = SessionManager()
@@ -156,20 +156,34 @@ class TorrentEngine(
 
     fun clearAllCache() {
         try {
-            activeHandles.values.forEach { handle ->
-                if (handle.isValid) {
-                    sessionManager.remove(handle, org.libtorrent4j.swig.session_handle.delete_files)
-                }
+            val torrents = sessionManager.swig().get_torrents()
+            val count = torrents.size
+            for (i in 0 until count.toInt()) {
+                val th = torrents.get(i)
+                sessionManager.swig().remove_torrent(th, org.libtorrent4j.swig.session_handle.delete_files)
             }
         } catch (e: Exception) {
-            android.util.Log.w("BookzorTorrent", "Error removing handles during cache wipe: ${e.message}")
+            android.util.Log.w("BookzorTorrent", "Error removing swig torrents during cache wipe: ${e.message}")
         }
+
         activeHandles.clear()
         schedulers.clear()
 
-        storageDir.listFiles()?.forEach { file ->
-            file.deleteRecursively()
+        // Delete all files and subdirectories from storage directory
+        try {
+            storageDir.listFiles()?.forEach { file ->
+                file.deleteRecursively()
+            }
+            // Double check bottom-up cleanup
+            storageDir.walkBottomUp().forEach { file ->
+                if (file != storageDir) {
+                    try { file.delete() } catch (_: Exception) {}
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("BookzorTorrent", "Error deleting storage files: ${e.message}")
         }
+
         android.util.Log.i("BookzorTorrent", "All torrent cache wiped successfully from disk.")
     }
 
