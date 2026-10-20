@@ -25,11 +25,14 @@ class AbbScraperService(
 
     suspend fun search(query: String, page: Int = 1): Resource<List<BookSearchResult>> = withContext(Dispatchers.IO) {
         val domain = domainManager.getActiveDomain()
-        val encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.name())
+        // ABB backend strictly requires lowercase query strings for multi-word author & title searches
+        val clean = query.trim().lowercase()
+        val encodedQuery = URLEncoder.encode(clean, StandardCharsets.UTF_8.name())
+        // tt=1 instructs ABB to perform a full title/author search
         val url = if (page <= 1) {
-            "$domain/?s=$encodedQuery"
+            "$domain/?s=$encodedQuery&tt=1"
         } else {
-            "$domain/page/$page/?s=$encodedQuery"
+            "$domain/page/$page/?s=$encodedQuery&tt=1"
         }
 
         try {

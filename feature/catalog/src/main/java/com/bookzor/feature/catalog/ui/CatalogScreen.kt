@@ -208,7 +208,16 @@ fun CatalogScreen(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search title, author, or narrator...", color = Color.Gray) },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
+                        IconButton(onClick = {
+                            focusManager.clearFocus()
+                            onSearch(state.query)
+                        }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     },
                     trailingIcon = {
                         if (state.query.isNotEmpty()) {
