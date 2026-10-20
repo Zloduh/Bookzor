@@ -41,7 +41,7 @@ class TorrentEngine(
         schedulers.clear()
     }
 
-    fun downloadMagnet(magnetUri: String): TorrentHandle {
+    fun downloadMagnet(magnetUri: String): TorrentHandle? {
         start()
 
         val match = Regex("btih:([a-fA-F0-9]{40})").find(magnetUri)
@@ -55,9 +55,9 @@ class TorrentEngine(
 
         val sha1 = Sha1Hash.parseHex(hashStr)
         val handle = sessionManager.find(sha1)
-            ?: throw IllegalStateException("Could not retrieve TorrentHandle for $hashStr")
-
-        activeHandles[hashStr] = handle
+        if (handle != null) {
+            activeHandles[hashStr] = handle
+        }
         return handle
     }
 

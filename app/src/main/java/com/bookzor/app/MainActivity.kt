@@ -3,18 +3,18 @@ package com.bookzor.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.navigation.compose.rememberNavController
+import com.bookzor.app.navigation.AppNavigation
+import com.bookzor.core.database.BookzorDatabase
+import com.bookzor.core.player.AudioPlayerController
+import com.bookzor.core.torrent.TorrentEngine
+import com.bookzor.core.torrent.TorrentStreamServer
 
 val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFFF5722),
@@ -26,28 +26,51 @@ val DarkColorScheme = darkColorScheme(
 )
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var torrentEngine: TorrentEngine
+    private lateinit var streamServer: TorrentStreamServer
+    private lateinit var playerController: AudioPlayerController
+    private lateinit var database: BookzorDatabase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize core engines
+        database = BookzorDatabase.getInstance(applicationContext)
+        torrentEngine = TorrentEngine(applicationContext)
+        torrentEngine.start()
+
+        streamServer = TorrentStreamServer(torrentEngine, port = 8080)
+        streamServer.start()
+
+        playerController = AudioPlayerController(
+            context = applicationContext,
+            playbackStateDao = database.playbackStateDao()
+        )
+
         setContent {
             MaterialTheme(colorScheme = DarkColorScheme) {
-                Scaffold(
+                Surface(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = Color.Black
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Bookzor 🎧\nAudiobook Streamer",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                    }
+                    color = Color.Black
+                ) {
+                    val navController = rememberNavController()
+                    AppNavigation(
+                        navController = navController,
+                        torrentEngine = torrentEngine,
+                        streamServer = streamServer,
+                        playerController = playerController,
+                        database = database
+                    )
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        streamServer.stop()
+        torrentEngine.stop()
+        playerController.release()
+        super.onDestroy()
     }
 }

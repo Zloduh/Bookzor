@@ -27,10 +27,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // libtorrent4j & Android native binaries (arm64 for tablet, plus arm & x86_64)
-    implementation(libs.libtorrent4j)
-    implementation(libs.libtorrent4j.android.arm64)
-    implementation(libs.libtorrent4j.android.arm)
-    implementation(libs.libtorrent4j.android.x64)
+    api(libs.libtorrent4j)
+    api(libs.libtorrent4j.android.arm64)
+    api(libs.libtorrent4j.android.arm)
+    api(libs.libtorrent4j.android.x64)
 
     // Embedded HTTP Range Loopback Server
     implementation(libs.ktor.server.core)
