@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
@@ -72,9 +73,30 @@ fun LibraryScreen(
 ) {
     var bookToDelete by remember { mutableStateOf<BookEntity?>(null) }
     var selectedBookBookmarks by remember { mutableStateOf<Pair<BookEntity, List<com.bookzor.core.database.entity.BookmarkEntity>>?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val availableSpaceGb = remember {
+        val freeBytes = context.filesDir.usableSpace
+        freeBytes.toFloat() / (1024 * 1024 * 1024)
+    }
 
     Scaffold(
         containerColor = Color.Black,
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFD4D4D4))
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Available space on the device: ${String.format("%.2f", availableSpaceGb)} GB",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
         topBar = {
             Row(
                 modifier = Modifier
@@ -89,19 +111,22 @@ fun LibraryScreen(
                         tint = Color.White
                     )
                 }
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "My Library 📚",
+                    text = "BOOKS",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontSize = 17.sp,
+                    letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "${books.size} Books",
-                    color = Color(0xFFFF5722),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
+                IconButton(onClick = onNavigateToDiscover) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                        contentDescription = "Add Audiobook",
+                        tint = Color.White
+                    )
+                }
             }
         }
     ) { innerPadding ->

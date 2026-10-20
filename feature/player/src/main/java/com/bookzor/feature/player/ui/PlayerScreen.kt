@@ -1,6 +1,7 @@
 package com.bookzor.feature.player.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -17,21 +18,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,11 +54,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.bookzor.core.database.entity.AudioTrackEntity
 import com.bookzor.core.database.entity.BookEntity
+import com.bookzor.core.database.entity.BookmarkEntity
+import com.bookzor.core.torrent.model.TorrentStatus
 import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerScreen(
-    book: BookEntity,
+    book: BookEntity?,
     tracks: List<AudioTrackEntity>,
     activeTrackIndex: Int,
     isPlaying: Boolean,
@@ -64,8 +70,11 @@ fun PlayerScreen(
     playbackSpeed: Float,
     volumeBoostMb: Int,
     pieces: BooleanArray?,
-    torrentStatus: com.bookzor.core.torrent.model.TorrentStatus? = null,
-    bookmarks: List<com.bookzor.core.database.entity.BookmarkEntity> = emptyList(),
+    torrentStatus: TorrentStatus? = null,
+    bookmarks: List<BookmarkEntity> = emptyList(),
+    onOpenDrawer: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    onOpenBooksLibrary: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSeekChapter: (Long) -> Unit,
     onJumpBack: (Int) -> Unit = {},
@@ -77,80 +86,63 @@ fun PlayerScreen(
     onBoostChange: (Int) -> Unit,
     onBookmark: () -> Unit,
     onAddBookmarkWithNote: (String?) -> Unit = {},
-    onDeleteBookmark: (com.bookzor.core.database.entity.BookmarkEntity) -> Unit = {},
-    onNavigateBack: () -> Unit,
+    onDeleteBookmark: (BookmarkEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var showSpeedSheet by remember { mutableStateOf(false) }
-    var showSleepSheet by remember { mutableStateOf(false) }
     var showChapterSheet by remember { mutableStateOf(false) }
     var showBookmarksSheet by remember { mutableStateOf(false) }
     var showJumpDialog by remember { mutableStateOf(false) }
 
-    var jumpBackSec by remember { androidx.compose.runtime.mutableIntStateOf(15) }
-    var jumpForwardSec by remember { androidx.compose.runtime.mutableIntStateOf(30) }
+    var jumpBackSec by remember { mutableIntStateOf(15) }
+    var jumpForwardSec by remember { mutableIntStateOf(15) }
 
-    var sleepRemainingSeconds by remember { mutableStateOf<Long?>(null) }
-    var isShakeToReset by remember { mutableStateOf(true) }
+    val hasActiveBook = book != null && book.infoHash.isNotEmpty()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Black,
         topBar = {
-            // Header Bar
+            // Header Bar matching IMG_4454: [ ☰ ]   [ ⏱ ]   [ 📖 ]
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onNavigateBack) {
+                // 1. Hamburger Menu (Opens Drawer)
+                IconButton(onClick = onOpenDrawer) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
-                // Sleep Timer Icon
-                IconButton(onClick = { showSleepSheet = true }) {
+                // 2. Sleep Timer Icon
+                IconButton(onClick = onOpenSleepTimer) {
                     Icon(
                         imageVector = Icons.Default.Timer,
                         contentDescription = "Sleep Timer",
-                        tint = if (sleepRemainingSeconds != null) Color(0xFFFF5722) else Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                // Title
-                Text(
-                    text = book.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Bookmarks List Icon
-                IconButton(onClick = { showBookmarksSheet = true }) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Bookmark,
-                        contentDescription = "Bookmarks",
-                        tint = if (bookmarks.isNotEmpty()) Color(0xFFFF5722) else Color.White
-                    )
-                }
-
-                // Chapters Drawer Icon
-                IconButton(onClick = { showChapterSheet = true }) {
+                // 3. Chapters Drawer Icon
+                IconButton(onClick = {
+                    if (hasActiveBook) showChapterSheet = true else onOpenBooksLibrary()
+                }) {
                     Icon(
                         imageVector = Icons.Default.MenuBook,
                         contentDescription = "Chapters",
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -161,111 +153,72 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            val isTablet = maxWidth >= 600.dp
+            val isTabletLandscape = maxWidth >= 800.dp && maxWidth > maxHeight
+            val activeChapterTitle = tracks.getOrNull(activeTrackIndex)?.fileName ?: "01. Chapter title"
 
-            if (isTablet) {
-                // --- TABLET SPLIT-VIEW CANVAS ---
+            if (isTabletLandscape && hasActiveBook) {
+                // Tablet Split-View
                 Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                    // Left Column: Artwork + Player Controls
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        PlayerCoverArt(
-                            coverUrl = book.coverUrl,
-                            title = book.title,
-                            onTogglePlayPause = onTogglePlayPause,
-                            onNextTrack = onNextTrack,
-                            onPrevTrack = onPrevTrack,
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .padding(8.dp)
+                        // Top Book Metadata Strip
+                        OlegBookStrip(
+                            book = book,
+                            totalDurationMs = book?.totalDurationMs ?: 0L,
+                            elapsedMs = positionMs,
+                            onOpenLibrary = onOpenBooksLibrary
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        Text(
-                            text = tracks.getOrNull(activeTrackIndex)?.fileName ?: book.title,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                        PlayerCoverArt(
+                            coverUrl = book?.coverUrl,
+                            title = book?.title ?: "",
+                            onTogglePlayPause = onTogglePlayPause,
+                            onNextTrack = onNextTrack,
+                            onPrevTrack = onPrevTrack,
+                            modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
                         )
-                        Text(
-                            text = "${book.author}${if (book.narrator != null) " • Read by ${book.narrator}" else ""}",
-                            color = Color.Gray,
-                            fontSize = 13.sp,
-                            maxLines = 1
-                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        SwarmHud(torrentStatus = torrentStatus, isBuffering = isBuffering)
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Live BitTorrent Swarm Telemetry HUD
-                        SwarmHud(torrentStatus = torrentStatus, isBuffering = isBuffering)
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        if (isBuffering) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                androidx.compose.material3.CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color(0xFFFF5722)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Connecting to swarm & buffering...",
-                                    color = Color(0xFFFFB74D),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-
-                        DualProgressTracker(
-                            bookDurationMs = book.totalDurationMs,
-                            bookElapsedMs = positionMs,
-                            chapterDurationMs = chapterDurationMs,
-                            chapterPositionMs = positionMs,
+                        OlegPlayerDeck(
+                            chapterTitle = activeChapterTitle,
+                            positionMs = positionMs,
+                            durationMs = chapterDurationMs,
                             pieces = pieces,
-                            onSeekChapter = onSeekChapter
-                        )
-
-                        PlayerControlDeck(
                             isPlaying = isPlaying,
                             playbackSpeed = playbackSpeed,
-                            volumeBoostMb = volumeBoostMb,
                             jumpBackSec = jumpBackSec,
                             jumpForwardSec = jumpForwardSec,
                             onTogglePlayPause = onTogglePlayPause,
+                            onSeek = onSeekChapter,
                             onJumpBack = { onJumpBack(jumpBackSec) },
                             onJumpForward = { onJumpForward(jumpForwardSec) },
+                            onNextChapter = onNextTrack,
+                            onPrevChapter = onPrevTrack,
                             onBookmark = {
                                 onBookmark()
                                 scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
                             },
-                            onOpenSpeedAndBoost = { showSpeedSheet = true },
-                            onOpenJumpSettings = { showJumpDialog = true }
+                            onOpenSpeedAndBoost = { showSpeedSheet = true }
                         )
                     }
 
                     Spacer(modifier = Modifier.width(24.dp))
 
-                    // Right Column: Embedded Chapter List & Torrent Swarm for Tablet
+                    // Right Side: Chapter List
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(Color(0xFF141414))
                             .padding(16.dp)
                     ) {
@@ -273,10 +226,9 @@ fun PlayerScreen(
                             text = "Chapters & Tracks (${tracks.size})",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                            fontSize = 17.sp
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-
                         ChapterListContent(
                             tracks = tracks,
                             activeTrackIndex = activeTrackIndex,
@@ -287,78 +239,107 @@ fun PlayerScreen(
                     }
                 }
             } else {
-                // --- PHONE VERTICAL LAYOUT ---
+                // Portrait Phone / Tablet Vertical Layout (Exact match to IMG_4454)
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    PlayerCoverArt(
-                        coverUrl = book.coverUrl,
-                        title = book.title,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onNextTrack = onNextTrack,
-                        onPrevTrack = onPrevTrack,
+                    // 1. Top Book Strip
+                    OlegBookStrip(
+                        book = book,
+                        totalDurationMs = book?.totalDurationMs ?: 0L,
+                        elapsedMs = positionMs,
+                        onOpenLibrary = onOpenBooksLibrary
+                    )
+
+                    // 2. Center Area: Cover Art OR "Please select audiobook"
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .aspectRatio(1f)
-                            .padding(12.dp)
-                    )
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (hasActiveBook) {
+                            PlayerCoverArt(
+                                coverUrl = book?.coverUrl,
+                                title = book?.title ?: "",
+                                onTogglePlayPause = onTogglePlayPause,
+                                onNextTrack = onNextTrack,
+                                onPrevTrack = onPrevTrack,
+                                modifier = Modifier.fillMaxHeight().aspectRatio(1f)
+                            )
+                        } else {
+                            // Empty State matching IMG_4454
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(110.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1E1E1E))
+                                        .clickable { onOpenBooksLibrary() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Select Audiobook",
+                                        tint = Color(0xFF666666),
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "Please select audiobook",
+                                    color = Color.Gray,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
 
-                    Text(
-                        text = tracks.getOrNull(activeTrackIndex)?.fileName ?: book.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${book.author}${if (book.narrator != null) " • Read by ${book.narrator}" else ""}",
-                        color = Color.Gray,
-                        fontSize = 13.sp,
-                        maxLines = 1
-                    )
+                    // 3. Swarm Telemetry (if streaming)
+                    if (hasActiveBook && torrentStatus != null) {
+                        SwarmHud(
+                            torrentStatus = torrentStatus,
+                            isBuffering = isBuffering,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Live BitTorrent Swarm Telemetry HUD
-                    SwarmHud(torrentStatus = torrentStatus, isBuffering = isBuffering)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    DualProgressTracker(
-                        bookDurationMs = book.totalDurationMs,
-                        bookElapsedMs = positionMs,
-                        chapterDurationMs = chapterDurationMs,
-                        chapterPositionMs = positionMs,
+                    // 4. Bottom Control Deck Panel
+                    OlegPlayerDeck(
+                        chapterTitle = activeChapterTitle,
+                        positionMs = positionMs,
+                        durationMs = chapterDurationMs,
                         pieces = pieces,
-                        onSeekChapter = onSeekChapter
-                    )
-
-                    PlayerControlDeck(
                         isPlaying = isPlaying,
                         playbackSpeed = playbackSpeed,
-                        volumeBoostMb = volumeBoostMb,
                         jumpBackSec = jumpBackSec,
                         jumpForwardSec = jumpForwardSec,
-                        onTogglePlayPause = onTogglePlayPause,
+                        onTogglePlayPause = {
+                            if (hasActiveBook) onTogglePlayPause() else onOpenBooksLibrary()
+                        },
+                        onSeek = onSeekChapter,
                         onJumpBack = { onJumpBack(jumpBackSec) },
                         onJumpForward = { onJumpForward(jumpForwardSec) },
+                        onNextChapter = onNextTrack,
+                        onPrevChapter = onPrevTrack,
                         onBookmark = {
-                            onBookmark()
-                            scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
+                            if (hasActiveBook) {
+                                onBookmark()
+                                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
+                            }
                         },
-                        onOpenSpeedAndBoost = { showSpeedSheet = true },
-                        onOpenJumpSettings = { showJumpDialog = true }
+                        onOpenSpeedAndBoost = { showSpeedSheet = true }
                     )
                 }
             }
         }
     }
 
-    // Bottom Sheets
+    // Sheets
     if (showSpeedSheet) {
         SpeedAndBoostBottomSheet(
             currentSpeed = playbackSpeed,
@@ -369,23 +350,6 @@ fun PlayerScreen(
         )
     }
 
-    if (showSleepSheet) {
-        SleepTimerBottomSheet(
-            remainingSeconds = sleepRemainingSeconds,
-            isShakeToResetEnabled = isShakeToReset,
-            onSetTimerMinutes = { mins ->
-                sleepRemainingSeconds = mins * 60L
-                scope.launch { snackbarHostState.showSnackbar("Sleep timer set for $mins minutes") }
-            },
-            onCancelTimer = {
-                sleepRemainingSeconds = null
-                scope.launch { snackbarHostState.showSnackbar("Sleep timer turned off") }
-            },
-            onToggleShakeToReset = { isShakeToReset = it },
-            onDismiss = { showSleepSheet = false }
-        )
-    }
-
     if (showChapterSheet) {
         ChapterDrawerBottomSheet(
             tracks = tracks,
@@ -393,16 +357,6 @@ fun PlayerScreen(
             currentTrackPositionMs = positionMs,
             onSelectTrack = onSelectTrack,
             onDismiss = { showChapterSheet = false }
-        )
-    }
-
-    if (showJumpDialog) {
-        JumpIntervalsDialog(
-            currentBackSec = jumpBackSec,
-            currentForwardSec = jumpForwardSec,
-            onBackSecChange = { jumpBackSec = it },
-            onForwardSecChange = { jumpForwardSec = it },
-            onDismiss = { showJumpDialog = false }
         )
     }
 
@@ -421,6 +375,105 @@ fun PlayerScreen(
             onDeleteBookmark = onDeleteBookmark,
             onDismiss = { showBookmarksSheet = false }
         )
+    }
+
+    if (showJumpDialog) {
+        JumpIntervalsDialog(
+            currentBackSec = jumpBackSec,
+            currentForwardSec = jumpForwardSec,
+            onBackSecChange = { jumpBackSec = it },
+            onForwardSecChange = { jumpForwardSec = it },
+            onDismiss = { showJumpDialog = false }
+        )
+    }
+}
+
+@Composable
+fun OlegBookStrip(
+    book: BookEntity?,
+    totalDurationMs: Long,
+    elapsedMs: Long,
+    onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val durationText = formatDuration(totalDurationMs)
+    val readText = formatDuration(elapsedMs)
+    val percent = if (totalDurationMs > 0) ((elapsedMs.toFloat() / totalDurationMs) * 100).toInt().coerceIn(0, 100) else 0
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onOpenLibrary() }
+            .background(Color(0xFF0F0F0F))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Thumbnail or Waveform Box (matching IMG_4454)
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF1E1E1E)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!book?.coverUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = book?.coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Text(text = "〰️", fontSize = 20.sp, color = Color(0xFFFF5722))
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Book title & Duration/Read stats
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = book?.title ?: "Book Title",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Duration:       $durationText",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Read:           $readText ( $percent% )",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
+        // Cast Icon
+        IconButton(onClick = {}) {
+            Icon(
+                imageVector = Icons.Default.Cast,
+                contentDescription = "AirPlay/Cast",
+                tint = Color.Gray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

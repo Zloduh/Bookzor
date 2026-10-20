@@ -93,8 +93,13 @@ class TorrentEngine(
     }
 
     fun getHandle(infoHash: String): TorrentHandle? {
-        val cleanHash = infoHash.lowercase()
-        return activeHandles[cleanHash] ?: sessionManager.find(Sha1Hash.parseHex(cleanHash))
+        val cleanHash = infoHash.trim().lowercase()
+        if (cleanHash.length != 40) return null
+        return activeHandles[cleanHash] ?: try {
+            sessionManager.find(Sha1Hash.parseHex(cleanHash))
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun downloadEntireBook(infoHash: String, magnetUri: String): TorrentHandle? {
@@ -158,7 +163,11 @@ class TorrentEngine(
     }
 
     fun observeTorrent(infoHash: String): Flow<TorrentStatus?> = flow {
-        val cleanHash = infoHash.lowercase()
+        val cleanHash = infoHash.trim().lowercase()
+        if (cleanHash.length != 40) {
+            emit(null)
+            return@flow
+        }
         while (currentCoroutineContext().isActive) {
             val handle = getHandle(cleanHash)
             if (handle == null || !handle.isValid) {
