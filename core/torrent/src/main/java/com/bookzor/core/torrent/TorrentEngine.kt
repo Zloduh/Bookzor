@@ -154,6 +154,25 @@ class TorrentEngine(
         schedulers.remove(cleanHash)
     }
 
+    fun clearAllCache() {
+        try {
+            activeHandles.values.forEach { handle ->
+                if (handle.isValid) {
+                    sessionManager.remove(handle, org.libtorrent4j.swig.session_handle.delete_files)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("BookzorTorrent", "Error removing handles during cache wipe: ${e.message}")
+        }
+        activeHandles.clear()
+        schedulers.clear()
+
+        storageDir.listFiles()?.forEach { file ->
+            file.deleteRecursively()
+        }
+        android.util.Log.i("BookzorTorrent", "All torrent cache wiped successfully from disk.")
+    }
+
     fun getScheduler(infoHash: String): PiecePriorityScheduler? {
         val cleanHash = infoHash.lowercase()
         val handle = getHandle(cleanHash) ?: return null

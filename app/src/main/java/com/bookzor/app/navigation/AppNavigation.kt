@@ -405,9 +405,8 @@ fun AppNavigation(
                         cacheDir = torrentEngine.storageDir,
                         onClearAllCache = {
                             scope.launch(Dispatchers.IO) {
-                                torrentEngine.storageDir.listFiles()?.forEach { file ->
-                                    file.deleteRecursively()
-                                }
+                                torrentEngine.clearAllCache()
+                                database.bookDao().resetAllDownloadFlags()
                             }
                         },
                         onNavigateBack = { navController.popBackStack() }

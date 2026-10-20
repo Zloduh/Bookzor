@@ -31,6 +31,9 @@ interface BookDao {
     @Query("UPDATE books SET is_download_requested = :download WHERE info_hash = :infoHash")
     suspend fun setDownloadRequested(infoHash: String, download: Boolean)
 
+    @Query("UPDATE books SET is_download_requested = 0")
+    suspend fun resetAllDownloadFlags()
+
     @Query("DELETE FROM books WHERE info_hash = :infoHash")
     suspend fun deleteBook(infoHash: String)
 }

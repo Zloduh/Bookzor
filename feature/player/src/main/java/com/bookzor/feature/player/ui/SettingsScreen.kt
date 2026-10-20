@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.bookzor.core.common.AppTheme
 import com.bookzor.core.common.ThemeManager
 import com.bookzor.core.scraper.DomainManager
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -77,16 +78,25 @@ fun SettingsScreen(
     var wifiOnly by remember { mutableStateOf(false) }
     var smartRewind by remember { mutableStateOf(true) }
 
-    val usedSpaceMb = remember {
-        val totalBytes = cacheDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
-        totalBytes / (1024 * 1024)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    var cacheRefreshKey by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+
+    val usedSpaceMb by androidx.compose.runtime.produceState(initialValue = 0L, cacheRefreshKey) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val totalBytes = cacheDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
+            totalBytes / (1024 * 1024)
+        }
     }
 
-    val freeSpaceGb = remember {
-        context.filesDir.usableSpace.toFloat() / (1024 * 1024 * 1024)
+    val freeSpaceGb by androidx.compose.runtime.produceState(initialValue = 0f, cacheRefreshKey) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            context.filesDir.usableSpace.toFloat() / (1024 * 1024 * 1024)
+        }
     }
 
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         containerColor = Color.Black,
         topBar = {
             Row(
@@ -271,7 +281,11 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         onClearAllCache()
+                        cacheRefreshKey++
                         showClearCacheDialog = false
+                        scope.launch {
+                            snackbarHostState.showSnackbar("All torrent cache cleared successfully.")
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
                 ) {
