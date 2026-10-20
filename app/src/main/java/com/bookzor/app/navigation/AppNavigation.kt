@@ -244,10 +244,16 @@ fun AppNavigation(
                     value = withContext(Dispatchers.IO) {
                         libraryBooks.map { b ->
                             val s = database.playbackStateDao().getPlaybackState(b.infoHash)
+                            val handle = torrentEngine.getHandle(b.infoHash)
+                            val status = try { if (handle != null && handle.isValid) handle.status() else null } catch (_: Exception) { null }
+                            val progress = status?.progress() ?: 0f
+                            val isFinished = (status?.isFinished ?: false) || progress >= 0.99f
+
                             com.bookzor.feature.library.ui.LibraryBookItem(
                                 book = b,
                                 state = s,
-                                isFullyDownloaded = false
+                                isFullyDownloaded = isFinished,
+                                downloadProgress = progress
                             )
                         }
                     }

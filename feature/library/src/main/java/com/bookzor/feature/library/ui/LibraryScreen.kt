@@ -286,18 +286,45 @@ fun LibraryBookCard(
                     )
                 }
 
-                if (book.isDownloadRequested) {
+                if (item.isFullyDownloaded) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Offline",
+                        text = "🟢 Offline (100%)",
                         color = Color(0xFF4CAF50),
                         fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else if (book.isDownloadRequested) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    val percent = (item.downloadProgress * 100).toInt()
+                    Text(
+                        text = "📥 Downloading $percent%",
+                        color = Color(0xFFFFB74D),
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Streaming",
+                        color = Color.Gray,
+                        fontSize = 11.sp
                     )
                 }
             }
 
-            if (playedProgress > 0) {
+            // Download Progress Line (if still downloading)
+            if (!item.isFullyDownloaded && book.isDownloadRequested) {
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = item.downloadProgress.coerceIn(0f, 1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp),
+                    color = Color(0xFFFFB74D),
+                    trackColor = Color(0xFF2E2E2E)
+                )
+            } else if (playedProgress > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = playedProgress,
