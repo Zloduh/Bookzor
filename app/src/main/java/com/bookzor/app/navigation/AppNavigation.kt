@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ sealed class Screen(val route: String) {
     data object Library : Screen("library")
     data object SleepTimer : Screen("sleep_timer")
     data object AllBookmarks : Screen("all_bookmarks")
+    data object Settings : Screen("settings")
     data object Detail : Screen("detail?url={url}") {
         fun createRoute(url: String): String = "detail?url=" + java.net.URLEncoder.encode(url, "UTF-8")
     }
@@ -98,7 +100,7 @@ fun AppNavigation(
                             DrawerDestination.DISCOVER -> navController.navigate(Screen.Catalog.route)
                             DrawerDestination.SLEEP_TIMER -> navController.navigate(Screen.SleepTimer.route)
                             DrawerDestination.BOOKMARKS -> navController.navigate(Screen.AllBookmarks.route)
-                            DrawerDestination.SETTINGS -> {}
+                            DrawerDestination.SETTINGS -> navController.navigate(Screen.Settings.route)
                         }
                     }
                 )
@@ -388,6 +390,24 @@ fun AppNavigation(
                                 database.bookDao().setInLibrary(infoHash, true)
                                 database.bookDao().setDownloadRequested(infoHash, true)
                                 torrentEngine.downloadEntireBook(infoHash, magnetUri)
+                            }
+                        },
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                // --- 7. SETTINGS SCREEN ---
+                composable(Screen.Settings.route) {
+                    val domainManager = remember { com.bookzor.core.scraper.DomainManager() }
+
+                    com.bookzor.feature.player.ui.SettingsScreen(
+                        domainManager = domainManager,
+                        cacheDir = torrentEngine.storageDir,
+                        onClearAllCache = {
+                            scope.launch(Dispatchers.IO) {
+                                torrentEngine.storageDir.listFiles()?.forEach { file ->
+                                    file.deleteRecursively()
+                                }
                             }
                         },
                         onNavigateBack = { navController.popBackStack() }

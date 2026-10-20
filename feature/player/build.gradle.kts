@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":core:player"))
     implementation(project(":core:torrent"))
     implementation(project(":core:database"))
+    implementation(project(":core:scraper"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

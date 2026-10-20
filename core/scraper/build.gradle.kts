@@ -24,8 +24,8 @@ android {
 dependencies {
     implementation(project(":core:common"))
     implementation(libs.androidx.core.ktx)
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
+    api(libs.okhttp)
+    api(libs.okhttp.logging)
     implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
