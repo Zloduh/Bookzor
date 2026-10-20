@@ -77,6 +77,7 @@ fun CatalogRoute(
         recentBooks = recentBooks,
         onQueryChange = viewModel::onQueryChange,
         onSearch = viewModel::search,
+        onLoadNextPage = viewModel::loadNextPage,
         onSelectCategory = viewModel::selectCategory,
         onBookClick = onBookClick,
         onResumeBook = onResumeBook,
@@ -92,6 +93,7 @@ fun CatalogScreen(
     recentBooks: List<RecentBookItem> = emptyList(),
     onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
+    onLoadNextPage: () -> Unit = {},
     onSelectCategory: (String) -> Unit,
     onBookClick: (String) -> Unit,
     onResumeBook: (com.bookzor.core.database.entity.BookEntity, com.bookzor.core.database.entity.PlaybackStateEntity) -> Unit = { _, _ -> },
@@ -102,6 +104,21 @@ fun CatalogScreen(
     val focusManager = LocalFocusManager.current
     val categories = listOf("All", "Sci-Fi", "Fantasy", "Adults", "Classic", "Fiction", "History", "Non-fiction")
     var showPasteDialog by remember { mutableStateOf(false) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    val shouldLoadMore = remember {
+        androidx.compose.runtime.derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && last >= total - 3
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value && state.canLoadMore && !state.isLoadingMore) {
+            onLoadNextPage()
+        }
+    }
 
     Scaffold(
         containerColor = Color.Black,
@@ -136,6 +153,24 @@ fun CatalogScreen(
                         fontSize = 22.sp
                     )
                     Spacer(modifier = Modifier.weight(1f))
+
+                    // Theme Button
+                    var showThemeDialog by remember { mutableStateOf(false) }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF222222))
+                            .clickable { showThemeDialog = true }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(text = "🎨", fontSize = 14.sp)
+                    }
+
+                    if (showThemeDialog) {
+                        ThemePickerDialog(onDismiss = { showThemeDialog = false })
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     // My Library Button
                     Box(
@@ -270,6 +305,7 @@ fun CatalogScreen(
                 }
                 else -> {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -302,6 +338,23 @@ fun CatalogScreen(
                                 onClick = { onBookClick(book.detailUrl) },
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
+                        }
+
+                        if (state.isLoadingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = Color(0xFFFF5722),
+                                        modifier = Modifier.size(28.dp),
+                                        strokeWidth = 2.5.dp
+                                    )
+                                }
+                            }
                         }
                     }
                 }

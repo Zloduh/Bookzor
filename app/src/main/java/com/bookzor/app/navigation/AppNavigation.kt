@@ -207,8 +207,8 @@ fun AppNavigation(
                     bookmarks = bookmarks,
                     onTogglePlayPause = { playerController.togglePlayPause() },
                     onSeekChapter = { targetMs -> playerController.seekTo(targetMs) },
-                    onJumpBack = { playerController.jumpBack(15) },
-                    onJumpForward = { playerController.jumpForward(30) },
+                    onJumpBack = { seconds -> playerController.jumpBack(seconds) },
+                    onJumpForward = { seconds -> playerController.jumpForward(seconds) },
                     onNextTrack = {
                         val nextIdx = playerState.currentTrackIndex + 1
                         if (nextIdx < tracks.size) {

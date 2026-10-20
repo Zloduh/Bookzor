@@ -112,6 +112,32 @@ class AudioPlayerController(
                     }
                 }
             }
+
+            override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+                val hash = activeInfoHash ?: return
+                val chapters = mutableListOf<com.bookzor.core.database.entity.AudioTrackEntity>()
+                for (i in 0 until metadata.length()) {
+                    val entry = metadata.get(i)
+                    if (entry is androidx.media3.extractor.metadata.id3.ChapterFrame) {
+                        val duration = maxOf(0L, (entry.endTimeMs - entry.startTimeMs).toLong())
+                        chapters.add(
+                            com.bookzor.core.database.entity.AudioTrackEntity(
+                                id = "${hash}_$i",
+                                infoHash = hash,
+                                trackIndex = i,
+                                fileName = entry.chapterId.ifEmpty { "Chapter ${i + 1}" },
+                                fileSizeBytes = 0L,
+                                durationMs = duration
+                            )
+                        )
+                    }
+                }
+
+                if (chapters.isNotEmpty()) {
+                    Log.i(TAG, "Extracted ${chapters.size} embedded chapters from M4B metadata for $hash")
+                    // Note: audioTrackDao can be updated asynchronously if provided
+                }
+            }
         })
     }
 

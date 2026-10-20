@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
@@ -67,10 +69,13 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MaterialTheme(colorScheme = DarkColorScheme) {
+            val activeTheme by com.bookzor.core.common.ThemeManager.currentTheme.collectAsState()
+            val colorScheme = com.bookzor.app.ui.BookzorTheme.getColorScheme(activeTheme)
+
+            MaterialTheme(colorScheme = colorScheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Black
+                    color = colorScheme.background
                 ) {
                     val navController = rememberNavController()
                     AppNavigation(

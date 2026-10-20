@@ -31,6 +31,13 @@ class PlaybackService : MediaSessionService() {
             )
         }
 
+        val notificationProvider = androidx.media3.session.DefaultMediaNotificationProvider.Builder(applicationContext)
+            .setChannelId("bookzor_playback")
+            .setChannelName(R.string.playback_channel_name)
+            .setNotificationId(101)
+            .build()
+        setMediaNotificationProvider(notificationProvider)
+
         val sessionBuilder = MediaSession.Builder(this, playerController.exoPlayer)
         if (intent != null) {
             sessionBuilder.setSessionActivity(intent)

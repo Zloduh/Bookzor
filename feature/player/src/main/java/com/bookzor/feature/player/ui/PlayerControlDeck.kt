@@ -35,11 +35,14 @@ fun PlayerControlDeck(
     isPlaying: Boolean,
     playbackSpeed: Float,
     volumeBoostMb: Int,
+    jumpBackSec: Int = 15,
+    jumpForwardSec: Int = 30,
     onTogglePlayPause: () -> Unit,
     onJumpBack: () -> Unit,
     onJumpForward: () -> Unit,
     onBookmark: () -> Unit,
     onOpenSpeedAndBoost: () -> Unit,
+    onOpenJumpSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -67,7 +70,7 @@ fun PlayerControlDeck(
             )
         }
 
-        // 2. Jump Back 15s Button
+        // 2. Jump Back Button
         Box(
             modifier = Modifier
                 .size(54.dp)
@@ -80,10 +83,10 @@ fun PlayerControlDeck(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "↺ 15",
+                text = "↺ $jumpBackSec",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                fontSize = 14.sp
             )
         }
 
@@ -107,7 +110,7 @@ fun PlayerControlDeck(
             )
         }
 
-        // 4. Jump Forward 30s Button
+        // 4. Jump Forward Button
         Box(
             modifier = Modifier
                 .size(54.dp)
@@ -120,10 +123,10 @@ fun PlayerControlDeck(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "30 ↻",
+                text = "$jumpForwardSec ↻",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                fontSize = 14.sp
             )
         }
 

@@ -68,8 +68,8 @@ fun PlayerScreen(
     bookmarks: List<com.bookzor.core.database.entity.BookmarkEntity> = emptyList(),
     onTogglePlayPause: () -> Unit,
     onSeekChapter: (Long) -> Unit,
-    onJumpBack: () -> Unit,
-    onJumpForward: () -> Unit,
+    onJumpBack: (Int) -> Unit = {},
+    onJumpForward: (Int) -> Unit = {},
     onNextTrack: () -> Unit,
     onPrevTrack: () -> Unit,
     onSelectTrack: (Int) -> Unit,
@@ -88,6 +88,10 @@ fun PlayerScreen(
     var showSleepSheet by remember { mutableStateOf(false) }
     var showChapterSheet by remember { mutableStateOf(false) }
     var showBookmarksSheet by remember { mutableStateOf(false) }
+    var showJumpDialog by remember { mutableStateOf(false) }
+
+    var jumpBackSec by remember { androidx.compose.runtime.mutableIntStateOf(15) }
+    var jumpForwardSec by remember { androidx.compose.runtime.mutableIntStateOf(30) }
 
     var sleepRemainingSeconds by remember { mutableStateOf<Long?>(null) }
     var isShakeToReset by remember { mutableStateOf(true) }
@@ -240,14 +244,17 @@ fun PlayerScreen(
                             isPlaying = isPlaying,
                             playbackSpeed = playbackSpeed,
                             volumeBoostMb = volumeBoostMb,
+                            jumpBackSec = jumpBackSec,
+                            jumpForwardSec = jumpForwardSec,
                             onTogglePlayPause = onTogglePlayPause,
-                            onJumpBack = onJumpBack,
-                            onJumpForward = onJumpForward,
+                            onJumpBack = { onJumpBack(jumpBackSec) },
+                            onJumpForward = { onJumpForward(jumpForwardSec) },
                             onBookmark = {
                                 onBookmark()
                                 scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
                             },
-                            onOpenSpeedAndBoost = { showSpeedSheet = true }
+                            onOpenSpeedAndBoost = { showSpeedSheet = true },
+                            onOpenJumpSettings = { showJumpDialog = true }
                         )
                     }
 
@@ -334,14 +341,17 @@ fun PlayerScreen(
                         isPlaying = isPlaying,
                         playbackSpeed = playbackSpeed,
                         volumeBoostMb = volumeBoostMb,
+                        jumpBackSec = jumpBackSec,
+                        jumpForwardSec = jumpForwardSec,
                         onTogglePlayPause = onTogglePlayPause,
-                        onJumpBack = onJumpBack,
-                        onJumpForward = onJumpForward,
+                        onJumpBack = { onJumpBack(jumpBackSec) },
+                        onJumpForward = { onJumpForward(jumpForwardSec) },
                         onBookmark = {
                             onBookmark()
                             scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
                         },
-                        onOpenSpeedAndBoost = { showSpeedSheet = true }
+                        onOpenSpeedAndBoost = { showSpeedSheet = true },
+                        onOpenJumpSettings = { showJumpDialog = true }
                     )
                 }
             }
@@ -383,6 +393,16 @@ fun PlayerScreen(
             currentTrackPositionMs = positionMs,
             onSelectTrack = onSelectTrack,
             onDismiss = { showChapterSheet = false }
+        )
+    }
+
+    if (showJumpDialog) {
+        JumpIntervalsDialog(
+            currentBackSec = jumpBackSec,
+            currentForwardSec = jumpForwardSec,
+            onBackSecChange = { jumpBackSec = it },
+            onForwardSecChange = { jumpForwardSec = it },
+            onDismiss = { showJumpDialog = false }
         )
     }
 
