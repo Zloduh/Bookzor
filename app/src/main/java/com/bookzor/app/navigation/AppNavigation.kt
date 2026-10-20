@@ -175,6 +175,9 @@ fun AppNavigation(
                 val torrentFlow = torrentEngine.observeTorrent(infoHash)
                 val torrentStatus by torrentFlow.collectAsState(initial = null)
 
+                val bookmarksFlow = database.bookmarkDao().observeBookmarks(infoHash)
+                val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
+
                 val displayBook = book ?: BookEntity(
                     infoHash = infoHash,
                     title = torrentStatus?.name ?: "Streaming Audiobook",
@@ -201,6 +204,7 @@ fun AppNavigation(
                     volumeBoostMb = playerState.volumeBoostMb,
                     pieces = torrentStatus?.pieces,
                     torrentStatus = torrentStatus,
+                    bookmarks = bookmarks,
                     onTogglePlayPause = { playerController.togglePlayPause() },
                     onSeekChapter = { targetMs -> playerController.seekTo(targetMs) },
                     onJumpBack = { playerController.jumpBack(15) },
@@ -234,6 +238,23 @@ fun AppNavigation(
                             )
                         }
                     },
+                    onAddBookmarkWithNote = { note ->
+                        scope.launch {
+                            database.bookmarkDao().insertBookmark(
+                                com.bookzor.core.database.entity.BookmarkEntity(
+                                    infoHash = infoHash,
+                                    trackIndex = playerState.currentTrackIndex,
+                                    positionMs = playerState.currentPositionMs,
+                                    note = note
+                                )
+                            )
+                        }
+                    },
+                    onDeleteBookmark = { bookmark ->
+                        scope.launch {
+                            database.bookmarkDao().deleteBookmark(bookmark)
+                        }
+                    },
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -250,12 +271,14 @@ fun AppNavigation(
                                 val status = try { if (handle != null && handle.isValid) handle.status() else null } catch (_: Exception) { null }
                                 val progress = status?.progress() ?: 0f
                                 val isFinished = (status?.isFinished ?: false) || progress >= 0.99f
+                                val marks = database.bookmarkDao().getBookmarks(b.infoHash)
 
                                 com.bookzor.feature.library.ui.LibraryBookItem(
                                     book = b,
                                     state = s,
                                     isFullyDownloaded = isFinished,
-                                    downloadProgress = progress
+                                    downloadProgress = progress,
+                                    bookmarks = marks
                                 )
                             }
                         }
@@ -272,6 +295,20 @@ fun AppNavigation(
                                 streamUrl = streamUrl,
                                 infoHash = book.infoHash,
                                 trackIndex = 0,
+                                title = book.title,
+                                artist = book.author
+                            )
+                            navController.navigate(Screen.Player.createRoute(book.infoHash))
+                        }
+                    },
+                    onPlayBookmark = { book, positionMs ->
+                        scope.launch {
+                            val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                            playerController.playStream(
+                                streamUrl = streamUrl,
+                                infoHash = book.infoHash,
+                                trackIndex = 0,
+                                startPositionMs = positionMs,
                                 title = book.title,
                                 artist = book.author
                             )

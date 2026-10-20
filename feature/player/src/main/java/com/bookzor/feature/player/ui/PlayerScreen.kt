@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
@@ -64,6 +65,7 @@ fun PlayerScreen(
     volumeBoostMb: Int,
     pieces: BooleanArray?,
     torrentStatus: com.bookzor.core.torrent.model.TorrentStatus? = null,
+    bookmarks: List<com.bookzor.core.database.entity.BookmarkEntity> = emptyList(),
     onTogglePlayPause: () -> Unit,
     onSeekChapter: (Long) -> Unit,
     onJumpBack: () -> Unit,
@@ -74,6 +76,8 @@ fun PlayerScreen(
     onSpeedChange: (Float) -> Unit,
     onBoostChange: (Int) -> Unit,
     onBookmark: () -> Unit,
+    onAddBookmarkWithNote: (String?) -> Unit = {},
+    onDeleteBookmark: (com.bookzor.core.database.entity.BookmarkEntity) -> Unit = {},
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -83,6 +87,7 @@ fun PlayerScreen(
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showSleepSheet by remember { mutableStateOf(false) }
     var showChapterSheet by remember { mutableStateOf(false) }
+    var showBookmarksSheet by remember { mutableStateOf(false) }
 
     var sleepRemainingSeconds by remember { mutableStateOf<Long?>(null) }
     var isShakeToReset by remember { mutableStateOf(true) }
@@ -126,6 +131,15 @@ fun PlayerScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
+
+                // Bookmarks List Icon
+                IconButton(onClick = { showBookmarksSheet = true }) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Bookmark,
+                        contentDescription = "Bookmarks",
+                        tint = if (bookmarks.isNotEmpty()) Color(0xFFFF5722) else Color.White
+                    )
+                }
 
                 // Chapters Drawer Icon
                 IconButton(onClick = { showChapterSheet = true }) {
@@ -369,6 +383,23 @@ fun PlayerScreen(
             currentTrackPositionMs = positionMs,
             onSelectTrack = onSelectTrack,
             onDismiss = { showChapterSheet = false }
+        )
+    }
+
+    if (showBookmarksSheet) {
+        BookmarksBottomSheet(
+            bookmarks = bookmarks,
+            currentPositionMs = positionMs,
+            onSelectBookmark = { b ->
+                onSeekChapter(b.positionMs)
+                scope.launch { snackbarHostState.showSnackbar("Jumped to bookmark at ${formatDuration(b.positionMs)}") }
+            },
+            onAddBookmarkWithNote = { note ->
+                onAddBookmarkWithNote(note)
+                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
+            },
+            onDeleteBookmark = onDeleteBookmark,
+            onDismiss = { showBookmarksSheet = false }
         )
     }
 }

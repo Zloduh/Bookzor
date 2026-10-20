@@ -55,13 +55,15 @@ data class LibraryBookItem(
     val book: BookEntity,
     val state: PlaybackStateEntity?,
     val isFullyDownloaded: Boolean = false,
-    val downloadProgress: Float = 0f
+    val downloadProgress: Float = 0f,
+    val bookmarks: List<com.bookzor.core.database.entity.BookmarkEntity> = emptyList()
 )
 
 @Composable
 fun LibraryScreen(
     books: List<LibraryBookItem>,
     onPlayBook: (BookEntity) -> Unit,
+    onPlayBookmark: (BookEntity, Long) -> Unit = { b, _ -> onPlayBook(b) },
     onDownloadBook: (BookEntity) -> Unit,
     onDeleteBook: (BookEntity) -> Unit,
     onNavigateToDiscover: () -> Unit,
@@ -69,6 +71,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier
 ) {
     var bookToDelete by remember { mutableStateOf<BookEntity?>(null) }
+    var selectedBookBookmarks by remember { mutableStateOf<Pair<BookEntity, List<com.bookzor.core.database.entity.BookmarkEntity>>?>(null) }
 
     Scaffold(
         containerColor = Color.Black,
@@ -150,12 +153,76 @@ fun LibraryScreen(
                             item = item,
                             onPlay = { onPlayBook(item.book) },
                             onDownload = { onDownloadBook(item.book) },
-                            onDelete = { bookToDelete = item.book }
+                            onDelete = { bookToDelete = item.book },
+                            onOpenBookmarks = {
+                                selectedBookBookmarks = item.book to item.bookmarks
+                            }
                         )
                     }
                 }
             }
         }
+    }
+
+    // Bookmarks Picker Dialog for Library book
+    if (selectedBookBookmarks != null) {
+        val (book, marks) = selectedBookBookmarks!!
+        AlertDialog(
+            onDismissRequest = { selectedBookBookmarks = null },
+            containerColor = Color(0xFF1E1E1E),
+            title = {
+                Text(
+                    text = "Bookmarks for ${book.title}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (marks.isEmpty()) {
+                        Text("No bookmarks saved for this book yet.", color = Color.Gray)
+                    } else {
+                        marks.forEach { mark ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF262626))
+                                    .clickable {
+                                        onPlayBookmark(book, mark.positionMs)
+                                        selectedBookBookmarks = null
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = String.format("%02d:%02d", (mark.positionMs / 1000) / 60, (mark.positionMs / 1000) % 60),
+                                    color = Color(0xFFFF5722),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = mark.note ?: "Bookmark",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                OutlinedButton(onClick = { selectedBookBookmarks = null }) {
+                    Text("Close", color = Color.LightGray)
+                }
+            }
+        )
     }
 
     // Confirmation dialog before deleting book files
@@ -200,6 +267,7 @@ fun LibraryBookCard(
     onPlay: () -> Unit,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
+    onOpenBookmarks: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val book = item.book
@@ -284,6 +352,24 @@ fun LibraryBookCard(
                         color = Color.LightGray,
                         fontSize = 11.sp
                     )
+                }
+
+                if (item.bookmarks.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF2E2218))
+                            .clickable { onOpenBookmarks() }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🔖 ${item.bookmarks.size}",
+                            color = Color(0xFFFFB74D),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 if (item.isFullyDownloaded) {

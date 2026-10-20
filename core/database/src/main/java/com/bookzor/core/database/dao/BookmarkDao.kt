@@ -15,6 +15,12 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks WHERE info_hash = :infoHash ORDER BY position_ms ASC")
     fun observeBookmarks(infoHash: String): Flow<List<BookmarkEntity>>
 
+    @Query("SELECT * FROM bookmarks WHERE info_hash = :infoHash ORDER BY position_ms ASC")
+    suspend fun getBookmarks(infoHash: String): List<BookmarkEntity>
+
+    @Query("SELECT COUNT(*) FROM bookmarks WHERE info_hash = :infoHash")
+    suspend fun getBookmarkCount(infoHash: String): Int
+
     @Delete
     suspend fun deleteBookmark(bookmark: BookmarkEntity)
 }
