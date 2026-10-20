@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class TorrentStreamServer(
     private val torrentEngine: TorrentEngine,
-    val port: Int = 8080
+    initialPort: Int = 8080
 ) {
     companion object {
         private const val TAG = "BookzorTorrentServer"
@@ -29,13 +29,36 @@ class TorrentStreamServer(
     private val isRunning = AtomicBoolean(false)
     private var serverJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO)
+    var port: Int = initialPort
+        private set
 
     fun start() {
         if (isRunning.getAndSet(true)) return
 
         try {
-            serverSocket = ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"))
-            Log.i(TAG, "TorrentStreamServer started on 127.0.0.1:$port")
+            var boundSocket: ServerSocket? = null
+            for (p in port..(port + 10)) {
+                try {
+                    val ss = ServerSocket()
+                    ss.reuseAddress = true
+                    ss.bind(java.net.InetSocketAddress(InetAddress.getByName("127.0.0.1"), p), 50)
+                    boundSocket = ss
+                    port = p
+                    break
+                } catch (_: Exception) {
+                    // Try next port
+                }
+            }
+
+            if (boundSocket == null) {
+                // Fallback to any free ephemeral port
+                val ss = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+                boundSocket = ss
+                port = ss.localPort
+            }
+
+            serverSocket = boundSocket
+            Log.i(TAG, "TorrentStreamServer successfully bound and listening on 127.0.0.1:$port")
 
             serverJob = scope.launch {
                 while (isActive && isRunning.get()) {
@@ -111,15 +134,23 @@ class TorrentStreamServer(
             }
             val fileIndex = queryParams["fileIndex"]?.toIntOrNull() ?: 0
 
-            val handle = torrentEngine.getHandle(infoHash)
+            // Wait up to 30 seconds for metadata if not ready yet
+            var handle = torrentEngine.getHandle(infoHash)
+            var attempts = 0
+            while ((handle == null || handle.torrentFile() == null || !handle.torrentFile().isValid) && attempts < 60 && isRunning.get()) {
+                kotlinx.coroutines.delay(500)
+                handle = torrentEngine.getHandle(infoHash)
+                attempts++
+            }
+
             if (handle == null || !handle.isValid) {
-                sendNotFound(output, "Torrent handle not ready")
+                sendNotFound(output, "Torrent handle timeout")
                 return@withContext
             }
 
             val torrentFile = handle.torrentFile()
             if (torrentFile == null || !torrentFile.isValid) {
-                sendNotFound(output, "Torrent metadata not yet loaded")
+                sendNotFound(output, "Torrent metadata fetch timeout (swarm slow or 0 seeds)")
                 return@withContext
             }
 
@@ -181,7 +212,13 @@ class TorrentStreamServer(
                 return@withContext
             }
 
-            // Stream data from file if present, or wait for pieces
+            // Stream data from file, waiting up to 20 seconds for first bytes if needed
+            var waitFileAttempts = 0
+            while ((!targetFile.exists() || targetFile.length() <= startByte) && waitFileAttempts < 40 && isRunning.get()) {
+                kotlinx.coroutines.delay(500)
+                waitFileAttempts++
+            }
+
             if (targetFile.exists()) {
                 RandomAccessFile(targetFile, "r").use { raf ->
                     raf.seek(startByte)
@@ -190,14 +227,18 @@ class TorrentStreamServer(
                     while (bytesRemaining > 0 && isRunning.get()) {
                         val toRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
                         val bytesRead = raf.read(buffer, 0, toRead)
-                        if (bytesRead == -1) break
+                        if (bytesRead == -1) {
+                            // Wait for more bytes if torrent is still downloading
+                            kotlinx.coroutines.delay(200)
+                            continue
+                        }
                         output.write(buffer, 0, bytesRead)
                         bytesRemaining -= bytesRead
                     }
                     output.flush()
                 }
             } else {
-                Log.w(TAG, "Target file ${targetFile.name} not created yet on disk by torrent engine")
+                Log.w(TAG, "Target file ${targetFile.name} timed out waiting for pieces on disk")
             }
         }
     }

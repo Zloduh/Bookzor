@@ -130,6 +130,7 @@ fun AppNavigation(
                 tracks = tracks,
                 activeTrackIndex = playerState.currentTrackIndex,
                 isPlaying = playerState.isPlaying,
+                isBuffering = playerState.isBuffering,
                 positionMs = playerState.currentPositionMs,
                 chapterDurationMs = playerState.durationMs,
                 playbackSpeed = playerState.playbackSpeed,

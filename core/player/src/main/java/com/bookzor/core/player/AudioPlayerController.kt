@@ -29,7 +29,8 @@ data class PlayerState(
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val playbackSpeed: Float = 1.0f,
-    val volumeBoostMb: Int = 0
+    val volumeBoostMb: Int = 0,
+    val errorMessage: String? = null
 )
 
 class AudioPlayerController(
@@ -79,6 +80,15 @@ class AudioPlayerController(
                 _playerState.value = _playerState.value.copy(
                     isBuffering = isBuffering,
                     durationMs = duration
+                )
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.e(TAG, "ExoPlayer error: ${error.errorCodeName} - ${error.message}", error)
+                _playerState.value = _playerState.value.copy(
+                    isPlaying = false,
+                    isBuffering = false,
+                    errorMessage = "Audio buffering: connecting to swarm..."
                 )
             }
         })

@@ -15,6 +15,9 @@ import com.bookzor.core.database.BookzorDatabase
 import com.bookzor.core.player.AudioPlayerController
 import com.bookzor.core.torrent.TorrentEngine
 import com.bookzor.core.torrent.TorrentStreamServer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFFF5722),
@@ -38,10 +41,13 @@ class MainActivity : ComponentActivity() {
         // Initialize core engines
         database = BookzorDatabase.getInstance(applicationContext)
         torrentEngine = TorrentEngine(applicationContext)
-        torrentEngine.start()
+        streamServer = TorrentStreamServer(torrentEngine, initialPort = 8080)
 
-        streamServer = TorrentStreamServer(torrentEngine, port = 8080)
-        streamServer.start()
+        // Start torrent engine and server in background
+        CoroutineScope(Dispatchers.IO).launch {
+            torrentEngine.start()
+            streamServer.start()
+        }
 
         playerController = AudioPlayerController(
             context = applicationContext,

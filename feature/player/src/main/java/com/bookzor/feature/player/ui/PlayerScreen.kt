@@ -57,6 +57,7 @@ fun PlayerScreen(
     tracks: List<AudioTrackEntity>,
     activeTrackIndex: Int,
     isPlaying: Boolean,
+    isBuffering: Boolean = false,
     positionMs: Long,
     chapterDurationMs: Long,
     playbackSpeed: Float,
@@ -183,6 +184,28 @@ fun PlayerScreen(
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
+
+                        if (isBuffering) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(0xFFFF5722)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Connecting to swarm & buffering...",
+                                    color = Color(0xFFFFB74D),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
 
                         DualProgressTracker(
                             bookDurationMs = book.totalDurationMs,
