@@ -63,6 +63,7 @@ fun PlayerScreen(
     playbackSpeed: Float,
     volumeBoostMb: Int,
     pieces: BooleanArray?,
+    torrentStatus: com.bookzor.core.torrent.model.TorrentStatus? = null,
     onTogglePlayPause: () -> Unit,
     onSeekChapter: (Long) -> Unit,
     onJumpBack: () -> Unit,
@@ -183,6 +184,11 @@ fun PlayerScreen(
                             maxLines = 1
                         )
 
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Live BitTorrent Swarm Telemetry HUD
+                        SwarmHud(torrentStatus = torrentStatus, isBuffering = isBuffering)
+
                         Spacer(modifier = Modifier.height(16.dp))
 
                         if (isBuffering) {
@@ -293,6 +299,11 @@ fun PlayerScreen(
                         fontSize = 13.sp,
                         maxLines = 1
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Live BitTorrent Swarm Telemetry HUD
+                    SwarmHud(torrentStatus = torrentStatus, isBuffering = isBuffering)
 
                     Spacer(modifier = Modifier.height(16.dp))
 

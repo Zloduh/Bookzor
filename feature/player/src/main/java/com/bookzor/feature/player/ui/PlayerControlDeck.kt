@@ -42,6 +42,8 @@ fun PlayerControlDeck(
     onOpenSpeedAndBoost: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -51,7 +53,10 @@ fun PlayerControlDeck(
     ) {
         // 1. Bookmark Button
         IconButton(
-            onClick = onBookmark,
+            onClick = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                onBookmark()
+            },
             modifier = Modifier.size(48.dp)
         ) {
             Icon(
@@ -68,7 +73,10 @@ fun PlayerControlDeck(
                 .size(54.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF222222))
-                .clickable { onJumpBack() },
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onJumpBack()
+                },
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -85,7 +93,10 @@ fun PlayerControlDeck(
                 .size(72.dp)
                 .clip(CircleShape)
                 .background(Color(0xFFFF5722))
-                .clickable { onTogglePlayPause() },
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onTogglePlayPause()
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -102,7 +113,10 @@ fun PlayerControlDeck(
                 .size(54.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF222222))
-                .clickable { onJumpForward() },
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onJumpForward()
+                },
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -118,7 +132,10 @@ fun PlayerControlDeck(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF222222))
-                .clickable { onOpenSpeedAndBoost() }
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onOpenSpeedAndBoost()
+                }
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {

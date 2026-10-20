@@ -18,10 +18,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -38,6 +40,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +63,9 @@ import com.bookzor.feature.catalog.CatalogViewModel
 @Composable
 fun CatalogRoute(
     onBookClick: (String) -> Unit, // passes detailUrl
+    onResumeBook: (com.bookzor.core.database.entity.BookEntity, com.bookzor.core.database.entity.PlaybackStateEntity) -> Unit,
+    onSubmitDirectMagnet: (String) -> Unit,
+    recentBooks: List<RecentBookItem> = emptyList(),
     viewModel: CatalogViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
@@ -65,10 +73,13 @@ fun CatalogRoute(
 
     CatalogScreen(
         state = state,
+        recentBooks = recentBooks,
         onQueryChange = viewModel::onQueryChange,
         onSearch = viewModel::search,
         onSelectCategory = viewModel::selectCategory,
         onBookClick = onBookClick,
+        onResumeBook = onResumeBook,
+        onSubmitDirectMagnet = onSubmitDirectMagnet,
         modifier = modifier
     )
 }
@@ -76,17 +87,34 @@ fun CatalogRoute(
 @Composable
 fun CatalogScreen(
     state: CatalogUiState,
+    recentBooks: List<RecentBookItem> = emptyList(),
     onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
     onSelectCategory: (String) -> Unit,
     onBookClick: (String) -> Unit,
+    onResumeBook: (com.bookzor.core.database.entity.BookEntity, com.bookzor.core.database.entity.PlaybackStateEntity) -> Unit = { _, _ -> },
+    onSubmitDirectMagnet: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
     val categories = listOf("All", "Sci-Fi", "Fantasy", "Adults", "Classic", "Fiction", "History", "Non-fiction")
+    var showPasteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color.Black,
+        floatingActionButton = {
+            androidx.compose.material3.FloatingActionButton(
+                onClick = { showPasteDialog = true },
+                containerColor = Color(0xFFFF5722),
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                    contentDescription = "Paste Magnet"
+                )
+            }
+        },
         topBar = {
             Column(
                 modifier = Modifier
@@ -228,19 +256,49 @@ fun CatalogScreen(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // 1. Continue Listening Shelf (if user has active books)
+                        if (recentBooks.isNotEmpty()) {
+                            item {
+                                ContinueListeningShelf(
+                                    recentBooks = recentBooks,
+                                    onResumeBook = onResumeBook
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+
+                        // 2. Discover ABB Audiobooks Header
+                        item {
+                            Text(
+                                text = "Discover on ABB",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            )
+                        }
+
                         items(state.books) { book ->
                             BookCard(
                                 book = book,
-                                onClick = { onBookClick(book.detailUrl) }
+                                onClick = { onBookClick(book.detailUrl) },
+                                modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showPasteDialog) {
+        PasteMagnetDialog(
+            onDismiss = { showPasteDialog = false },
+            onSubmitMagnetOrUrl = onSubmitDirectMagnet
+        )
     }
 }
 
