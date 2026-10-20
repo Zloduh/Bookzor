@@ -81,16 +81,35 @@ class TorrentEngine(
             if (handle == null || !handle.isValid) {
                 emit(null)
             } else {
-                val status = handle.status()
-                val info = if (handle.torrentFile() != null && handle.torrentFile().isValid) handle.torrentFile() else null
-                val numPieces = info?.numPieces() ?: 0
+                val status = try { handle.status() } catch (_: Exception) { null }
+                if (status == null) {
+                    emit(null)
+                    delay(1000)
+                    continue
+                }
 
+                val info = try {
+                    if (handle.torrentFile() != null && handle.torrentFile().isValid) handle.torrentFile() else null
+                } catch (_: Exception) {
+                    null
+                }
+
+                val numPieces = info?.numPieces() ?: 0
                 val piecesArray = BooleanArray(numPieces)
-                val piecesBitfield = status.pieces()
-                if (piecesBitfield != null && numPieces > 0) {
-                    for (i in 0 until numPieces) {
-                        piecesArray[i] = piecesBitfield.getBit(i)
+
+                try {
+                    val piecesBitfield = status.pieces()
+                    if (piecesBitfield != null) {
+                        val bitfieldSize = piecesBitfield.size()
+                        if (bitfieldSize > 0 && numPieces > 0) {
+                            val limit = minOf(numPieces, bitfieldSize)
+                            for (i in 0 until limit) {
+                                piecesArray[i] = piecesBitfield.getBit(i)
+                            }
+                        }
                     }
+                } catch (_: Throwable) {
+                    // Ignore transient native bitfield read errors while swarm connects
                 }
 
                 val torrentState = when (status.state()) {

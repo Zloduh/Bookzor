@@ -84,12 +84,23 @@ class AudioPlayerController(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                Log.e(TAG, "ExoPlayer error: ${error.errorCodeName} - ${error.message}", error)
+                Log.w(TAG, "ExoPlayer buffering/source wait: ${error.errorCodeName}")
                 _playerState.value = _playerState.value.copy(
                     isPlaying = false,
-                    isBuffering = false,
-                    errorMessage = "Audio buffering: connecting to swarm..."
+                    isBuffering = true
                 )
+                // Retry after swarm delivers pieces
+                scope.launch {
+                    delay(4000)
+                    if (_playerState.value.isBuffering && !exoPlayer.isPlaying) {
+                        try {
+                            exoPlayer.prepare()
+                            exoPlayer.play()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Retry wait: ${e.message}")
+                        }
+                    }
+                }
             }
         })
     }
@@ -148,6 +159,9 @@ class AudioPlayerController(
         if (exoPlayer.isPlaying) {
             exoPlayer.pause()
         } else {
+            if (exoPlayer.playbackState == Player.STATE_IDLE) {
+                exoPlayer.prepare()
+            }
             exoPlayer.play()
         }
     }
