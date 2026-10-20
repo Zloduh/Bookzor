@@ -24,6 +24,10 @@ data class BookEntity(
     val totalDurationMs: Long,
     @ColumnInfo(name = "source_url")
     val sourceUrl: String,
+    @ColumnInfo(name = "is_in_library")
+    val isInLibrary: Boolean = false,
+    @ColumnInfo(name = "is_download_requested")
+    val isDownloadRequested: Boolean = false,
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "last_accessed_at")

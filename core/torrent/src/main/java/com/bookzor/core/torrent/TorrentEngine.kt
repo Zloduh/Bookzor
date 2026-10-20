@@ -66,6 +66,47 @@ class TorrentEngine(
         return activeHandles[cleanHash] ?: sessionManager.find(Sha1Hash.parseHex(cleanHash))
     }
 
+    fun downloadEntireBook(infoHash: String, magnetUri: String): TorrentHandle? {
+        val handle = downloadMagnet(magnetUri) ?: return null
+        try {
+            val numPieces = handle.torrentFile()?.numPieces() ?: 0
+            for (i in 0 until numPieces) {
+                handle.piecePriority(i, org.libtorrent4j.Priority.DEFAULT)
+            }
+        } catch (_: Exception) {
+            // Pieces will be set as soon as metadata arrives
+        }
+        return handle
+    }
+
+    fun deleteTorrentAndFiles(infoHash: String) {
+        val cleanHash = infoHash.lowercase()
+        val handle = getHandle(cleanHash)
+
+        if (handle != null && handle.isValid) {
+            try {
+                val torrentFile = handle.torrentFile()
+                val filePath = if (torrentFile != null && torrentFile.isValid) torrentFile.files().filePath(0) else null
+                sessionManager.remove(handle, org.libtorrent4j.swig.session_handle.delete_files)
+
+                if (filePath != null) {
+                    val file = File(storageDir, filePath)
+                    if (file.exists()) file.delete()
+                    file.parentFile?.let { parent ->
+                        if (parent != storageDir && parent.exists() && parent.listFiles()?.isEmpty() == true) {
+                            parent.delete()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("BookzorTorrent", "Error deleting torrent: ${e.message}")
+            }
+        }
+
+        activeHandles.remove(cleanHash)
+        schedulers.remove(cleanHash)
+    }
+
     fun getScheduler(infoHash: String): PiecePriorityScheduler? {
         val cleanHash = infoHash.lowercase()
         val handle = getHandle(cleanHash) ?: return null

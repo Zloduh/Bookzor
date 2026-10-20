@@ -65,6 +65,7 @@ fun CatalogRoute(
     onBookClick: (String) -> Unit, // passes detailUrl
     onResumeBook: (com.bookzor.core.database.entity.BookEntity, com.bookzor.core.database.entity.PlaybackStateEntity) -> Unit,
     onSubmitDirectMagnet: (String) -> Unit,
+    onOpenLibrary: () -> Unit = {},
     recentBooks: List<RecentBookItem> = emptyList(),
     viewModel: CatalogViewModel = viewModel(),
     modifier: Modifier = Modifier
@@ -80,6 +81,7 @@ fun CatalogRoute(
         onBookClick = onBookClick,
         onResumeBook = onResumeBook,
         onSubmitDirectMagnet = onSubmitDirectMagnet,
+        onOpenLibrary = onOpenLibrary,
         modifier = modifier
     )
 }
@@ -94,6 +96,7 @@ fun CatalogScreen(
     onBookClick: (String) -> Unit,
     onResumeBook: (com.bookzor.core.database.entity.BookEntity, com.bookzor.core.database.entity.PlaybackStateEntity) -> Unit = { _, _ -> },
     onSubmitDirectMagnet: (String) -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
@@ -121,7 +124,7 @@ fun CatalogScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Header Brand
+                // Header Brand & Library Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -133,12 +136,24 @@ fun CatalogScreen(
                         fontSize = 22.sp
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = "ABB Streamer",
-                        color = Color(0xFFFF5722),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
-                    )
+
+                    // My Library Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF222222))
+                            .clickable { onOpenLibrary() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "📚 My Library",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))

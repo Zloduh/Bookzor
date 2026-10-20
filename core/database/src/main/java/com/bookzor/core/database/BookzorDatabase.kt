@@ -20,7 +20,7 @@ import com.bookzor.core.database.entity.PlaybackStateEntity
         PlaybackStateEntity::class,
         BookmarkEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BookzorDatabase : RoomDatabase() {
@@ -39,7 +39,9 @@ abstract class BookzorDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookzorDatabase::class.java,
                     "bookzor_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PlayArrow
@@ -50,22 +51,27 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.bookzor.core.scraper.model.BookDetail
 import com.bookzor.feature.detail.DetailViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun BookDetailRoute(
     detailUrl: String,
     onStreamClick: (String, String) -> Unit, // passes infoHash, magnetUri
+    onPutInLibrary: (String, String) -> Unit, // passes infoHash, magnetUri
     onNavigateBack: () -> Unit,
     viewModel: DetailViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
 
     LaunchedEffect(detailUrl) {
         viewModel.loadBook(detailUrl)
     }
 
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         containerColor = Color.Black,
         topBar = {
             Row(
@@ -130,6 +136,12 @@ fun BookDetailRoute(
                         detail = state.bookDetail!!,
                         onStreamClick = {
                             onStreamClick(state.bookDetail!!.infoHash, state.bookDetail!!.magnetUri)
+                        },
+                        onPutInLibrary = {
+                            onPutInLibrary(state.bookDetail!!.infoHash, state.bookDetail!!.magnetUri)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Added to Library. Downloading offline.")
+                            }
                         }
                     )
                 }
@@ -142,6 +154,7 @@ fun BookDetailRoute(
 fun BookDetailContent(
     detail: BookDetail,
     onStreamClick: () -> Unit,
+    onPutInLibrary: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isInspectorExpanded by remember { mutableStateOf(false) }
@@ -220,21 +233,45 @@ fun BookDetailContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // HERO CTA: Stream Now
+        // HERO CTAs: Stream Now & Put In Library
         Button(
             onClick = onStreamClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722)),
             shape = RoundedCornerShape(12.dp)
         ) {
             Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Stream Now (Sequential Torrent)",
+                text = "Stream Now (Sequential)",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 15.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        androidx.compose.material3.OutlinedButton(
+            onClick = onPutInLibrary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF444444))
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.Download,
+                contentDescription = null,
+                tint = Color(0xFFFF5722)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Put in Library (Download for Offline)",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp
             )
         }
 

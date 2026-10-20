@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 
 sealed class Screen(val route: String) {
     data object Catalog : Screen("catalog")
+    data object Library : Screen("library")
     data object Detail : Screen("detail?url={url}") {
         fun createRoute(url: String): String = "detail?url=" + java.net.URLEncoder.encode(url, "UTF-8")
     }
@@ -87,6 +88,7 @@ fun AppNavigation(
             composable(Screen.Catalog.route) {
                 CatalogRoute(
                     recentBooks = recentBooks,
+                    onOpenLibrary = { navController.navigate(Screen.Library.route) },
                     onBookClick = { detailUrl ->
                         navController.navigate(Screen.Detail.createRoute(detailUrl))
                     },
@@ -144,6 +146,13 @@ fun AppNavigation(
                             trackIndex = 0
                         )
                         navController.navigate(Screen.Player.createRoute(infoHash))
+                    },
+                    onPutInLibrary = { infoHash, magnetUri ->
+                        scope.launch(Dispatchers.IO) {
+                            database.bookDao().setInLibrary(infoHash, true)
+                            database.bookDao().setDownloadRequested(infoHash, true)
+                            torrentEngine.downloadEntireBook(infoHash, magnetUri)
+                        }
                     },
                     onNavigateBack = { navController.popBackStack() }
                 )
@@ -225,6 +234,53 @@ fun AppNavigation(
                         }
                     },
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            // --- 4. MY LIBRARY & OFFLINE SCREEN ---
+            composable(Screen.Library.route) {
+                val libraryBooks by database.bookDao().observeLibraryBooks().collectAsState(initial = emptyList())
+                val libraryItems by produceState<List<com.bookzor.feature.library.ui.LibraryBookItem>>(initialValue = emptyList(), libraryBooks) {
+                    value = withContext(Dispatchers.IO) {
+                        libraryBooks.map { b ->
+                            val s = database.playbackStateDao().getPlaybackState(b.infoHash)
+                            com.bookzor.feature.library.ui.LibraryBookItem(
+                                book = b,
+                                state = s,
+                                isFullyDownloaded = false
+                            )
+                        }
+                    }
+                }
+
+                com.bookzor.feature.library.ui.LibraryScreen(
+                    books = libraryItems,
+                    onPlayBook = { book ->
+                        scope.launch {
+                            val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                            playerController.playStream(
+                                streamUrl = streamUrl,
+                                infoHash = book.infoHash,
+                                trackIndex = 0,
+                                title = book.title,
+                                artist = book.author
+                            )
+                            navController.navigate(Screen.Player.createRoute(book.infoHash))
+                        }
+                    },
+                    onDownloadBook = { book ->
+                        // Request download
+                    },
+                    onDeleteBook = { book ->
+                        scope.launch(Dispatchers.IO) {
+                            torrentEngine.deleteTorrentAndFiles(book.infoHash)
+                            database.bookDao().setInLibrary(book.infoHash, false)
+                            database.bookDao().deleteBook(book.infoHash)
+                        }
+                    },
+                    onNavigateToDiscover = {
+                        navController.navigate(Screen.Catalog.route)
+                    }
                 )
             }
         }
