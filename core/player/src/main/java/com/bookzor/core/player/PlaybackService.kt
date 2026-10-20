@@ -38,7 +38,20 @@ class PlaybackService : MediaSessionService() {
             .build()
         setMediaNotificationProvider(notificationProvider)
 
+        val seekBackCmd = androidx.media3.session.CommandButton.Builder()
+            .setPlayerCommand(androidx.media3.common.Player.COMMAND_SEEK_BACK)
+            .setDisplayName("Rewind 15s")
+            .setIconResId(android.R.drawable.ic_media_rew)
+            .build()
+
+        val seekForwardCmd = androidx.media3.session.CommandButton.Builder()
+            .setPlayerCommand(androidx.media3.common.Player.COMMAND_SEEK_FORWARD)
+            .setDisplayName("Forward 15s")
+            .setIconResId(android.R.drawable.ic_media_ff)
+            .build()
+
         val sessionBuilder = MediaSession.Builder(this, playerController.exoPlayer)
+            .setCustomLayout(listOf(seekBackCmd, seekForwardCmd))
         if (intent != null) {
             sessionBuilder.setSessionActivity(intent)
         }

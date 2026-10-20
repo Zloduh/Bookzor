@@ -51,7 +51,7 @@ fun AppDrawerContent(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(280.dp)
+            .width(360.dp)
             .background(Color(0xFF141414))
             .padding(vertical = 24.dp)
     ) {

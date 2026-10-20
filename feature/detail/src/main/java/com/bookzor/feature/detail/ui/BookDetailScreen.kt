@@ -19,10 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +30,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,8 +59,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun BookDetailRoute(
     detailUrl: String,
-    onStreamClick: (String, String) -> Unit, // passes infoHash, magnetUri
-    onPutInLibrary: (String, String) -> Unit, // passes infoHash, magnetUri
+    onPutInLibrary: (String, String, Set<Int>) -> Unit, // infoHash, magnetUri, selectedIndices
     onSearchQuery: (String) -> Unit = {},
     onToggleToRead: (String, Boolean) -> Unit = { _, _ -> },
     onNavigateBack: () -> Unit,
@@ -65,8 +67,8 @@ fun BookDetailRoute(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var isToRead by remember { mutableStateOf(false) }
 
     LaunchedEffect(detailUrl) {
@@ -74,7 +76,7 @@ fun BookDetailRoute(
     }
 
     Scaffold(
-        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Row(
@@ -139,13 +141,10 @@ fun BookDetailRoute(
                     BookDetailContent(
                         detail = detail,
                         isToRead = isToRead,
-                        onStreamClick = {
-                            onStreamClick(detail.infoHash, detail.magnetUri)
-                        },
-                        onPutInLibrary = {
-                            onPutInLibrary(detail.infoHash, detail.magnetUri)
+                        onPutInLibrary = { selectedIndices ->
+                            onPutInLibrary(detail.infoHash, detail.magnetUri, selectedIndices)
                             scope.launch {
-                                snackbarHostState.showSnackbar("Added to Library. Downloading offline.")
+                                snackbarHostState.showSnackbar("Added to Library. Downloading ${selectedIndices.size} files offline.")
                             }
                         },
                         onToggleToRead = {
@@ -153,7 +152,7 @@ fun BookDetailRoute(
                             onToggleToRead(detail.infoHash, isToRead)
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    if (isToRead) "Added to To-Read List 🔖" else "Removed from To-Read List"
+                                    if (isToRead) "Added to Listen Later 🔖" else "Removed from Listen Later"
                                 )
                             }
                         },
@@ -169,13 +168,22 @@ fun BookDetailRoute(
 fun BookDetailContent(
     detail: BookDetail,
     isToRead: Boolean = false,
-    onStreamClick: () -> Unit,
-    onPutInLibrary: () -> Unit,
+    onPutInLibrary: (Set<Int>) -> Unit,
     onToggleToRead: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isInspectorExpanded by remember { mutableStateOf(false) }
+    var selectedFileIndices by remember { mutableStateOf(detail.tracks.indices.toSet()) }
+
+    val selectedBytes = remember(selectedFileIndices) {
+        detail.tracks.filter { it.index in selectedFileIndices }.sumOf { it.sizeBytes }
+    }
+    val selectedSizeText = when {
+        selectedBytes >= 1024 * 1024 * 1024 -> String.format("%.2f GB", selectedBytes.toFloat() / (1024 * 1024 * 1024))
+        selectedBytes >= 1024 * 1024 -> String.format("%d MB", selectedBytes / (1024 * 1024))
+        else -> "$selectedBytes bytes"
+    }
 
     Column(
         modifier = modifier
@@ -297,103 +305,82 @@ fun BookDetailContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // HERO CTAs: Stream Now & Put In Library
+        // THE TWO HERO BUTTONS: [ 📥 Download To Library ] & [ 🔖 Listen Later ]
         Button(
-            onClick = onStreamClick,
+            onClick = { onPutInLibrary(selectedFileIndices) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(54.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Stream Now (Sequential)",
+                text = "Download To Library ($selectedSizeText)",
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onPrimary
             )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        androidx.compose.material3.OutlinedButton(
+            onClick = onToggleToRead,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isToRead) MaterialTheme.colorScheme.primary else Color.Transparent,
+                contentColor = if (isToRead) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (isToRead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            // Put in Library (Download Offline)
-            androidx.compose.material3.OutlinedButton(
-                onClick = onPutInLibrary,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Library (Offline)",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-            }
-
-            // To-Read / Want to Read Later
-            androidx.compose.material3.OutlinedButton(
-                onClick = onToggleToRead,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (isToRead) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    contentColor = if (isToRead) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
-                ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (isToRead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Text(
-                    text = if (isToRead) "✓ In To-Read" else "🔖 To-Read List",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Bookmark,
+                contentDescription = null,
+                tint = if (isToRead) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (isToRead) "✓ In Listen Later" else "🔖 Add to Listen Later",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Torrent Inspector Card
+        // Torrent Inspector Card (with Selective Download Checkboxes!)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { isInspectorExpanded = !isInspectorExpanded }
                 .padding(14.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isInspectorExpanded = !isInspectorExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
-                        text = "Torrent Inspector",
+                        text = "Torrent Inspector & Files (${detail.tracks.size})",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
                     Text(
-                        text = "${detail.tracks.size} audio files • Hash: ${detail.infoHash.take(10)}...",
-                        color = Color.Gray,
-                        fontSize = 12.sp
+                        text = "Selected ${selectedFileIndices.size}/${detail.tracks.size} files • $selectedSizeText",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
                 Icon(
@@ -405,50 +392,86 @@ fun BookDetailContent(
 
             if (isInspectorExpanded) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Full Info Hash:\n${detail.infoHash}",
-                    color = Color(0xFFFFB74D),
-                    fontSize = 12.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
 
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Trackers (${detail.trackers.size}):",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-                detail.trackers.take(5).forEach { tracker ->
-                    Text(text = "• $tracker", color = Color.Gray, fontSize = 11.sp)
+                // Select All / Deselect All Toggle Buttons for large compilations
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Choose files to download:",
+                        color = Color.LightGray,
+                        fontSize = 12.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Select All",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { selectedFileIndices = detail.tracks.indices.toSet() }
+                                .padding(4.dp)
+                        )
+                        Text(
+                            text = "Deselect All",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clickable { selectedFileIndices = emptySet() }
+                                .padding(4.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "Audio Files (${detail.tracks.size}):",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // File list with checkboxes for compilation torrents
                 detail.tracks.forEach { track ->
+                    val isChecked = track.index in selectedFileIndices
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isChecked) Color(0xFF25201C) else Color.Transparent)
+                            .clickable {
+                                selectedFileIndices = if (isChecked) {
+                                    selectedFileIndices - track.index
+                                } else {
+                                    selectedFileIndices + track.index
+                                }
+                            }
+                            .padding(vertical = 6.dp, horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = isChecked,
+                            onCheckedChange = { checked ->
+                                selectedFileIndices = if (checked) {
+                                    selectedFileIndices + track.index
+                                } else {
+                                    selectedFileIndices - track.index
+                                }
+                            },
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = track.fileName,
-                            color = Color.LightGray,
-                            fontSize = 12.sp,
+                            color = if (isChecked) Color.White else Color.Gray,
+                            fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = track.sizeString,
-                            color = Color.Gray,
-                            fontSize = 12.sp
+                            color = if (isChecked) MaterialTheme.colorScheme.primary else Color.Gray,
+                            fontSize = 11.sp
                         )
                     }
                 }

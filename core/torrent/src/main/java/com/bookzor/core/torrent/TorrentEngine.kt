@@ -102,6 +102,34 @@ class TorrentEngine(
         }
     }
 
+    fun downloadSelectedFiles(infoHash: String, magnetUri: String, selectedIndices: Set<Int>): TorrentHandle? {
+        val handle = downloadMagnet(magnetUri) ?: return null
+
+        scope.launch {
+            var attempts = 0
+            while ((handle.torrentFile() == null || !handle.torrentFile().isValid) && attempts < 80) {
+                delay(500)
+                attempts++
+            }
+
+            val tf = handle.torrentFile()
+            if (tf != null && tf.isValid) {
+                val numFiles = tf.numFiles()
+                for (i in 0 until numFiles) {
+                    if (i in selectedIndices) {
+                        handle.filePriority(i, org.libtorrent4j.Priority.DEFAULT)
+                    } else {
+                        handle.filePriority(i, org.libtorrent4j.Priority.IGNORE)
+                    }
+                }
+                handle.resume()
+                android.util.Log.i("BookzorTorrent", "Selective download: prioritized ${selectedIndices.size} of $numFiles files for ${tf.name()}")
+            }
+        }
+
+        return handle
+    }
+
     fun downloadEntireBook(infoHash: String, magnetUri: String): TorrentHandle? {
         val handle = downloadMagnet(magnetUri) ?: return null
 

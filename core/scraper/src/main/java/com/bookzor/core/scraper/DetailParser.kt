@@ -64,12 +64,12 @@ object DetailParser {
                 }
             } else if (cells.size == 1 && cells[0].hasAttr("colspan")) {
                 val text = cells[0].text().trim()
-                // Track row e.g.: "B000R34YKC.m4b 1.12 GBs" or "01 - Chapter 1.mp3 45.2 MBs"
                 val audioExtensions = listOf(".m4b", ".mp3", ".m4a", ".ogg", ".opus", ".flac")
-                if (audioExtensions.any { text.contains(it, ignoreCase = true) }) {
-                    val parts = text.split(" ")
-                    val filename = parts.firstOrNull() ?: text
-                    val sizeStr = parts.drop(1).joinToString(" ").ifEmpty { "Unknown" }
+                val matchedExt = audioExtensions.firstOrNull { text.contains(it, ignoreCase = true) }
+                if (matchedExt != null) {
+                    val splitIdx = text.indexOf(matchedExt, ignoreCase = true) + matchedExt.length
+                    val filename = text.substring(0, splitIdx).trim()
+                    val sizeStr = text.substring(splitIdx).trim().ifEmpty { "Unknown" }
                     val bytes = parseBytes(sizeStr)
                     tracks.add(
                         AudioTrackInfo(

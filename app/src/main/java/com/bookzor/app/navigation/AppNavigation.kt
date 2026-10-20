@@ -424,22 +424,11 @@ fun AppNavigation(
 
                     BookDetailRoute(
                         detailUrl = detailUrl,
-                        onStreamClick = { infoHash, magnetUri ->
-                            torrentEngine.downloadMagnet(magnetUri)
-                            streamServer.start()
-                            val streamUrl = streamServer.getStreamUrl(infoHash, fileIndex = 0)
-                            playerController.playStream(
-                                streamUrl = streamUrl,
-                                infoHash = infoHash,
-                                trackIndex = 0
-                            )
-                            navController.navigate(Screen.Player.route)
-                        },
-                        onPutInLibrary = { infoHash, magnetUri ->
+                        onPutInLibrary = { infoHash, magnetUri, selectedIndices ->
                             scope.launch(Dispatchers.IO) {
                                 database.bookDao().setInLibrary(infoHash, true)
                                 database.bookDao().setDownloadRequested(infoHash, true)
-                                torrentEngine.downloadEntireBook(infoHash, magnetUri)
+                                torrentEngine.downloadSelectedFiles(infoHash, magnetUri, selectedIndices)
                             }
                         },
                         onSearchQuery = { query ->

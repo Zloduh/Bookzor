@@ -72,7 +72,7 @@ fun ToReadScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "TO-READ LIST",
+                    text = "LISTEN LATER",
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
@@ -105,14 +105,14 @@ fun ToReadScreen(
                     Text("🔖", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Your To-Read list is empty",
+                        text = "Your Listen Later list is empty",
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Tap 'Want to Read / Later' on any book detail page to save books here.",
+                        text = "Tap 'Add to Listen Later' on any book detail page to queue books here for later.",
                         color = Color.Gray,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         fontSize = 14.sp
