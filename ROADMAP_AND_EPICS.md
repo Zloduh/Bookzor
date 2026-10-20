@@ -27,7 +27,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 1.1.1: Initialize Gradle Root & Version Catalog**
+- [x] **Task 1.1.1: Initialize Gradle Root & Version Catalog**
   - **Path:** `settings.gradle.kts`, `gradle/libs.versions.toml`, `build.gradle.kts`
   - **Details:**
     - Configure Gradle 8.4+, AGP 8.3+, Kotlin 1.9.23+.
@@ -37,7 +37,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] `./gradlew tasks` executes without configuration errors.
     - [ ] Version catalog resolves all dependencies.
 
-- [ ] **Task 1.1.2: Configure App Module & Tablet Manifest**
+- [x] **Task 1.1.2: Configure App Module & Tablet Manifest**
   - **Path:** `app/build.gradle.kts`, `app/src/main/AndroidManifest.xml`
   - **Details:**
     - Set `compileSdk = 34`, `minSdk = 26`, `targetSdk = 34`.
@@ -59,7 +59,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 2.1.1: Implement DomainManager with Failover**
+- [x] **Task 2.1.1: Implement DomainManager with Failover**
   - **Path:** `core/scraper/src/main/java/com/bookzor/core/scraper/DomainManager.kt`
   - **Details:**
     - Maintain an ordered list of ABB mirrors: `listOf("https://audiobookbay.lu", "https://audiobookbay.is", "https://audiobookbay.nl", "https://audiobookbay.se")`.
@@ -69,7 +69,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Unit test: when primary domain throws `IOException`, fails over to secondary domain.
     - [ ] Returns valid base URL string.
 
-- [ ] **Task 2.1.2: Implement Search Parser**
+- [x] **Task 2.1.2: Implement Search Parser**
   - **Path:** `core/scraper/src/main/java/com/bookzor/core/scraper/SearchParser.kt`
   - **Details:**
     - Query URL: `https://<active-domain>/?s=<query>` (and `/?s=<query>&page=2`).
@@ -82,7 +82,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Unit test parsing recorded HTML fixture for query `"dune"`.
     - [ ] Extracts at least title, cover URL, and detail page URL for each result card.
 
-- [ ] **Task 2.1.3: Implement Detail Page Parser & InfoHash Extractor**
+- [x] **Task 2.1.3: Implement Detail Page Parser & InfoHash Extractor**
   - **Path:** `core/scraper/src/main/java/com/bookzor/core/scraper/DetailParser.kt`
   - **Details:**
     - Fetch detail page HTML via OkHttp with desktop Chrome User-Agent.
@@ -98,7 +98,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Correctly extracts InfoHash `061850ead3eb6f1c5c6d8420211b4bbf2d4ee3e2` from Dune detail page fixture.
     - [ ] Extracts at least 5 tracker URLs.
 
-- [ ] **Task 2.1.4: Implement Magnet URI Builder**
+- [x] **Task 2.1.4: Implement Magnet URI Builder**
   - **Path:** `core/scraper/src/main/java/com/bookzor/core/scraper/MagnetBuilder.kt`
   - **Details:**
     - Function: `buildMagnet(infoHash: String, title: String, trackers: List<String>): String`.
@@ -121,7 +121,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 3.1.1: Integrate libtorrent4j Native Engine**
+- [x] **Task 3.1.1: Integrate libtorrent4j Native Engine**
   - **Path:** `core/torrent/src/main/java/com/bookzor/core/torrent/TorrentEngine.kt`
   - **Details:**
     - Add `com.frostwire:libtorrent4j-android:2.1.0-33` dependency.
@@ -131,7 +131,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] `TorrentEngine.start()` starts session without native library linkage crash on `arm64-v8a`.
     - [ ] Session status logs show DHT nodes connecting.
 
-- [ ] **Task 3.1.2: Implement Sequential Piece Priority Scheduler**
+- [x] **Task 3.1.2: Implement Sequential Piece Priority Scheduler**
   - **Path:** `core/torrent/src/main/java/com/bookzor/core/torrent/PiecePriorityScheduler.kt`
   - **Details:**
     - On magnet add: fetch torrent metadata (`torrent_info`).
@@ -147,7 +147,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Verified piece priorities dynamically shift as `setPlaybackOffset` changes.
     - [ ] M4B header and trailer pieces are prioritized first on load.
 
-- [ ] **Task 3.1.3: Build Local HTTP 1.1 Range Loopback Server**
+- [x] **Task 3.1.3: Build Local HTTP 1.1 Range Loopback Server**
   - **Path:** `core/torrent/src/main/java/com/bookzor/core/torrent/TorrentStreamServer.kt`
   - **Details:**
     - Embed a lightweight HTTP server (Ktor Netty/CIO or NanoHTTPD) on `127.0.0.1:8080`.
@@ -172,7 +172,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 4.1.1: Implement PlaybackService (MediaSessionService)**
+- [x] **Task 4.1.1: Implement PlaybackService (MediaSessionService)**
   - **Path:** `core/player/src/main/java/com/bookzor/core/player/PlaybackService.kt`
   - **Details:**
     - Inherit from `androidx.media3.session.MediaSessionService`.
@@ -188,7 +188,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Unplugging headphones automatically pauses playback.
     - [ ] Lock screen displays active book title, cover, and controls.
 
-- [ ] **Task 4.1.2: Variable Speed with Sonic Pitch Preservation**
+- [x] **Task 4.1.2: Variable Speed with Sonic Pitch Preservation**
   - **Path:** `core/player/src/main/java/com/bookzor/core/player/SpeedController.kt`
   - **Details:**
     - Expose `setPlaybackSpeed(speed: Float)`.
@@ -197,7 +197,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
   - **Acceptance Criteria:**
     - [ ] Narrator pitch remains natural at 1.5x and 2.0x speeds.
 
-- [ ] **Task 4.1.3: Loudness Enhancer Integration**
+- [x] **Task 4.1.3: Loudness Enhancer Integration**
   - **Path:** `core/player/src/main/java/com/bookzor/core/player/LoudnessController.kt`
   - **Details:**
     - Attach `android.media.audiofx.LoudnessEnhancer(exoPlayer.audioSessionId)`.
@@ -217,7 +217,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 5.1.1: Build Dual Progress Trackers**
+- [x] **Task 5.1.1: Build Dual Progress Trackers**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/DualProgressTracker.kt`
   - **Details:**
     - **Overall Book Tracker:** Displays elapsed total time, remaining total time, and overall percentage across all tracks/chapters.
@@ -227,7 +227,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Overall progress reflects combined duration of all files in a multi-file torrent.
     - [ ] Piece cache bar highlights downloaded blocks in real time.
 
-- [ ] **Task 5.1.2: Implement Fine Scrubbing Gesture Slider**
+- [x] **Task 5.1.2: Implement Fine Scrubbing Gesture Slider**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/FineScrubbingSlider.kt`
   - **Details:**
     - Implement custom Compose pointer input gesture on the scrubber thumb.
@@ -241,7 +241,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Dragging down slows thumb sensitivity by the precise multiplier.
     - [ ] Releasing thumb seeks audio engine to the target position.
 
-- [ ] **Task 5.1.3: Ergonomic Control Deck & Jump Buttons**
+- [x] **Task 5.1.3: Ergonomic Control Deck & Jump Buttons**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/PlayerControlDeck.kt`
   - **Details:**
     - Large circular Play/Pause button (min 72dp touch target).
@@ -251,7 +251,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Single tap on Jump Back instantly rewinds 15s.
     - [ ] Tapping speed pill opens speed bottom sheet slider.
 
-- [ ] **Task 5.1.4: Sleep Timer with Shake-to-Reset & Fade Out**
+- [x] **Task 5.1.4: Sleep Timer with Shake-to-Reset & Fade Out**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/SleepTimerManager.kt`
   - **Details:**
     - Timer options: 15m, 30m, 45m, 60m, End of Chapter.
@@ -263,7 +263,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Audio fades out smoothly at end of timer.
     - [ ] Shaking device within last 60 seconds resets timer back to initial duration.
 
-- [ ] **Task 5.1.5: Cover Art Gestures**
+- [x] **Task 5.1.5: Cover Art Gestures**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/CoverArtGestures.kt`
   - **Details:**
     - Double tap: Toggle Play/Pause.
@@ -284,7 +284,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 6.1.1: Catalog & Search Screen**
+- [x] **Task 6.1.1: Catalog & Search Screen**
   - **Path:** `feature/catalog/src/main/java/com/bookzor/feature/catalog/ui/CatalogScreen.kt`
   - **Details:**
     - Search bar with instant suggestions from `recent_searches` table.
@@ -294,7 +294,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Searching "Frank Herbert" populates results with covers and titles.
     - [ ] Infinite scroll pagination triggers next page load.
 
-- [ ] **Task 6.1.2: Book Detail & Torrent Inspector Screen**
+- [x] **Task 6.1.2: Book Detail & Torrent Inspector Screen**
   - **Path:** `feature/detail/src/main/java/com/bookzor/feature/detail/ui/BookDetailScreen.kt`
   - **Details:**
     - High-res cover art header, full book synopsis.
@@ -315,7 +315,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 #### Tasks:
 
-- [ ] **Task 7.1.1: Room Database Implementation**
+- [x] **Task 7.1.1: Room Database Implementation**
   - **Path:** `core/database/src/main/java/com/bookzor/core/database/`
   - **Details:**
     - Define Room Database `BookzorDatabase` with entities: `BookEntity`, `AudioFileEntity`, `PlaybackStateEntity`, `BookmarkEntity`, `RecentSearchEntity`.
@@ -323,7 +323,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
   - **Acceptance Criteria:**
     - [ ] Room tests pass verifying CRUD operations on `PlaybackStateDao`.
 
-- [ ] **Task 7.1.2: Auto-Save State & Smart Rewind on Resume**
+- [x] **Task 7.1.2: Auto-Save State & Smart Rewind on Resume**
   - **Path:** `core/player/src/main/java/com/bookzor/core/player/PlaybackProgressTracker.kt`
   - **Details:**
     - Save position every 5 seconds during active playback and immediately upon pause.
@@ -335,7 +335,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - [ ] Force killing the app and restarting resumes within 5 seconds of last position.
     - [ ] Smart rewind subtracts appropriate seconds when resuming after an extended pause.
 
-- [ ] **Task 7.1.3: Offline Storage & Cache Manager UI**
+- [x] **Task 7.1.3: Offline Storage & Cache Manager UI**
   - **Path:** `feature/library/src/main/java/com/bookzor/feature/library/ui/LibraryScreen.kt`
   - **Details:**
     - "My Books" screen displaying books categorized by: In Progress, Completed, Downloaded.
