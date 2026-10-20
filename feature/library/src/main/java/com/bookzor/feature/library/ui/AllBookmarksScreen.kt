@@ -52,7 +52,7 @@ fun AllBookmarksScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -153,12 +153,15 @@ fun AllBookmarksScreen(
                                     )
                                 }
 
-                                IconButton(onClick = { onDeleteBookmark(bookmark) }) {
+                                IconButton(
+                                    onClick = { onDeleteBookmark(bookmark) },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete",
-                                        tint = Color(0xFF666666),
-                                        modifier = Modifier.size(18.dp)
+                                        tint = Color(0xFFFF5252),
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }

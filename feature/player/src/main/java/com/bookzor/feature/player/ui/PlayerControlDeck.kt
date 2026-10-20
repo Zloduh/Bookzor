@@ -210,7 +210,7 @@ fun OlegPlayerDeck(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Bookmark Flag (Bottom-Left)
+            // Bookmark Flag (Bottom-Left) -> Opens Bookmarks drawer directly!
             IconButton(
                 onClick = {
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -220,8 +220,8 @@ fun OlegPlayerDeck(
             ) {
                 Icon(
                     imageVector = Icons.Default.Bookmark,
-                    contentDescription = "Bookmark",
-                    tint = Color(0xFFD0D0D0),
+                    contentDescription = "Bookmarks",
+                    tint = Color(0xFFFF5722),
                     modifier = Modifier.size(26.dp)
                 )
             }

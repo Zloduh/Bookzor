@@ -204,10 +204,7 @@ fun PlayerScreen(
                             onJumpForward = { onJumpForward(jumpForwardSec) },
                             onNextChapter = onNextTrack,
                             onPrevChapter = onPrevTrack,
-                            onBookmark = {
-                                onBookmark()
-                                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
-                            },
+                            onBookmark = { showBookmarksSheet = true },
                             onOpenSpeedAndBoost = { showSpeedSheet = true }
                         )
                     }
@@ -328,10 +325,7 @@ fun PlayerScreen(
                         onNextChapter = onNextTrack,
                         onPrevChapter = onPrevTrack,
                         onBookmark = {
-                            if (hasActiveBook) {
-                                onBookmark()
-                                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
-                            }
+                            if (hasActiveBook) showBookmarksSheet = true else onOpenBooksLibrary()
                         },
                         onOpenSpeedAndBoost = { showSpeedSheet = true }
                     )
