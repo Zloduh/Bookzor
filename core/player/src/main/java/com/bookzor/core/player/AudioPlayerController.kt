@@ -40,6 +40,9 @@ class AudioPlayerController(
 ) {
     companion object {
         private const val TAG = "BookzorPlayer"
+        @Volatile
+        var instance: AudioPlayerController? = null
+            internal set
     }
 
     val exoPlayer: ExoPlayer = run {
@@ -75,6 +78,7 @@ class AudioPlayerController(
     private var lastPauseTimestamp: Long = 0L
 
     init {
+        instance = this
         exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _playerState.value = _playerState.value.copy(isPlaying = isPlaying)
@@ -151,6 +155,7 @@ class AudioPlayerController(
         title: String? = null,
         artist: String? = null
     ) {
+        ensureServiceStarted()
         activeInfoHash = infoHash
 
         // Calculate Smart Rewind if resuming after pause
@@ -197,6 +202,7 @@ class AudioPlayerController(
         if (exoPlayer.isPlaying) {
             exoPlayer.pause()
         } else {
+            ensureServiceStarted()
             if (exoPlayer.playbackState == Player.STATE_IDLE) {
                 exoPlayer.prepare()
             }
@@ -204,8 +210,25 @@ class AudioPlayerController(
         }
     }
 
+    fun ensureServiceStarted() {
+        try {
+            val intent = android.content.Intent(context, PlaybackService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            android.util.Log.i(TAG, "PlaybackService startForegroundService requested successfully")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error starting PlaybackService", e)
+        }
+    }
+
     fun stop() {
         exoPlayer.stop()
+        try {
+            context.stopService(android.content.Intent(context, PlaybackService::class.java))
+        } catch (_: Exception) {}
         _playerState.value = _playerState.value.copy(
             isPlaying = false,
             currentInfoHash = null

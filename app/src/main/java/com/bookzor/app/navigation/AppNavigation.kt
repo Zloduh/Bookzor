@@ -3,6 +3,7 @@ package com.bookzor.app.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
@@ -468,7 +469,7 @@ fun AppNavigation(
             }
 
             // Docked MiniPlayer when on other screens
-            if (!isPlayerScreen && activeInfoHash != null && playerState.currentInfoHash != null) {
+            if (!isPlayerScreen && activeBook != null) {
                 MiniPlayerBar(
                     title = activeBook?.title ?: "Audiobook",
                     author = activeBook?.author,
@@ -482,7 +483,10 @@ fun AppNavigation(
                     onExpand = {
                         navController.navigate(Screen.Player.route)
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
                 )
             }
         }

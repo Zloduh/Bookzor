@@ -40,10 +40,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize core engines
-        database = BookzorDatabase.getInstance(applicationContext)
-        torrentEngine = TorrentEngine(applicationContext)
-        streamServer = TorrentStreamServer(torrentEngine, initialPort = 8080)
+        // Retrieve singleton core engines from Application
+        val app = application as BookzorApplication
+        database = app.database
+        torrentEngine = app.torrentEngine
+        streamServer = app.streamServer
+        playerController = app.playerController
+        playerController.ensureServiceStarted()
 
         // Start torrent engine and server in background
         CoroutineScope(Dispatchers.IO).launch {
@@ -62,11 +65,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
-        playerController = AudioPlayerController(
-            context = applicationContext,
-            playbackStateDao = database.playbackStateDao()
-        )
 
         setContent {
             val activeTheme by com.bookzor.core.common.ThemeManager.currentTheme.collectAsState()
@@ -91,9 +89,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        streamServer.stop()
-        torrentEngine.stop()
-        playerController.release()
         super.onDestroy()
     }
 }
