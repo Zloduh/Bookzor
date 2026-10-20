@@ -2,15 +2,20 @@ package com.bookzor.core.torrent
 
 import android.content.Context
 import com.bookzor.core.torrent.model.TorrentStatus
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.libtorrent4j.SessionManager
+import org.libtorrent4j.SessionParams
+import org.libtorrent4j.SettingsPack
 import org.libtorrent4j.Sha1Hash
 import org.libtorrent4j.TorrentHandle
+import org.libtorrent4j.swig.settings_pack
 import org.libtorrent4j.swig.torrent_flags_t
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -19,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TorrentEngine(
     private val context: Context
 ) {
+    private val scope = CoroutineScope(Dispatchers.IO)
     private val sessionManager = SessionManager()
     private val isRunning = AtomicBoolean(false)
     private val activeHandles = ConcurrentHashMap<String, TorrentHandle>()
@@ -30,8 +36,26 @@ class TorrentEngine(
 
     fun start() {
         if (isRunning.getAndSet(true)) return
-        sessionManager.start()
+
+        val sp = SettingsPack()
+        // DHT Bootstrap Routers
+        val routers = "router.bittorrent.com:6881,dht.transmissionbt.com:6881,router.utorrent.com:6881,dht.libtorrent.org:25401"
+        sp.setString(settings_pack.string_types.dht_bootstrap_nodes.swigValue(), routers)
+        sp.setBoolean(settings_pack.bool_types.enable_dht.swigValue(), true)
+        sp.setBoolean(settings_pack.bool_types.enable_lsd.swigValue(), true)
+        sp.setInteger(settings_pack.int_types.connections_limit.swigValue(), 100)
+        sp.setInteger(settings_pack.int_types.active_downloads.swigValue(), 10)
+
+        sessionManager.start(SessionParams(sp))
         sessionManager.startDht()
+
+        scope.launch {
+            while (isActive) {
+                delay(5000)
+                val nodes = sessionManager.dhtNodes()
+                android.util.Log.i("BookzorTorrent", "DHT nodes: $nodes | Active torrents: ${activeHandles.size}")
+            }
+        }
     }
 
     fun stop() {
@@ -55,8 +79,15 @@ class TorrentEngine(
 
         val sha1 = Sha1Hash.parseHex(hashStr)
         val handle = sessionManager.find(sha1)
-        if (handle != null) {
+
+        if (handle != null && handle.isValid) {
             activeHandles[hashStr] = handle
+            // Force immediate announce to trackers and DHT
+            try {
+                handle.forceReannounce()
+                handle.forceDHTAnnounce()
+                handle.resume()
+            } catch (_: Exception) {}
         }
         return handle
     }
@@ -68,14 +99,25 @@ class TorrentEngine(
 
     fun downloadEntireBook(infoHash: String, magnetUri: String): TorrentHandle? {
         val handle = downloadMagnet(magnetUri) ?: return null
-        try {
-            val numPieces = handle.torrentFile()?.numPieces() ?: 0
-            for (i in 0 until numPieces) {
-                handle.piecePriority(i, org.libtorrent4j.Priority.DEFAULT)
+
+        scope.launch {
+            var attempts = 0
+            while ((handle.torrentFile() == null || !handle.torrentFile().isValid) && attempts < 80) {
+                delay(500)
+                attempts++
             }
-        } catch (_: Exception) {
-            // Pieces will be set as soon as metadata arrives
+
+            val tf = handle.torrentFile()
+            if (tf != null && tf.isValid) {
+                val totalPieces = tf.numPieces()
+                for (i in 0 until totalPieces) {
+                    handle.piecePriority(i, org.libtorrent4j.Priority.DEFAULT)
+                }
+                handle.resume()
+                android.util.Log.i("BookzorTorrent", "Full book download started: $totalPieces pieces queued for ${tf.name()}")
+            }
         }
+
         return handle
     }
 

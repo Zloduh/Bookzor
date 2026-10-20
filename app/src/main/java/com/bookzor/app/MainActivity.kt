@@ -47,6 +47,18 @@ class MainActivity : ComponentActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             torrentEngine.start()
             streamServer.start()
+
+            // Resume all books marked for offline download in library
+            val libraryBooks = database.bookDao().observeAllBooks()
+            libraryBooks.collect { books ->
+                for (book in books) {
+                    if (book.isDownloadRequested && torrentEngine.getHandle(book.infoHash) == null) {
+                        val magnet = com.bookzor.core.scraper.MagnetBuilder.build(book.infoHash, book.title)
+                        torrentEngine.downloadEntireBook(book.infoHash, magnet)
+                        android.util.Log.i("BookzorTorrent", "Resumed offline download for ${book.title}")
+                    }
+                }
+            }
         }
 
         playerController = AudioPlayerController(

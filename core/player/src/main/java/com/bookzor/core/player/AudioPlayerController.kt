@@ -42,16 +42,26 @@ class AudioPlayerController(
         private const val TAG = "BookzorPlayer"
     }
 
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
-        .setAudioAttributes(
-            AudioAttributes.Builder()
-                .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                .setUsage(C.USAGE_MEDIA)
-                .build(),
-            /* handleAudioFocus = */ true
-        )
-        .setHandleAudioBecomingNoisy(true)
-        .build()
+    val exoPlayer: ExoPlayer = run {
+        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(45_000)
+            .setReadTimeoutMs(45_000)
+            .setAllowCrossProtocolRedirects(true)
+
+        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                /* handleAudioFocus = */ true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+    }
 
     private var loudnessEnhancer: LoudnessEnhancer? = null
 

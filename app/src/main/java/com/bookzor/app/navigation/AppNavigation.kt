@@ -28,6 +28,7 @@ import com.bookzor.feature.detail.ui.BookDetailRoute
 import com.bookzor.feature.player.ui.MiniPlayerBar
 import com.bookzor.feature.player.ui.PlayerScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -241,21 +242,24 @@ fun AppNavigation(
             composable(Screen.Library.route) {
                 val libraryBooks by database.bookDao().observeLibraryBooks().collectAsState(initial = emptyList())
                 val libraryItems by produceState<List<com.bookzor.feature.library.ui.LibraryBookItem>>(initialValue = emptyList(), libraryBooks) {
-                    value = withContext(Dispatchers.IO) {
-                        libraryBooks.map { b ->
-                            val s = database.playbackStateDao().getPlaybackState(b.infoHash)
-                            val handle = torrentEngine.getHandle(b.infoHash)
-                            val status = try { if (handle != null && handle.isValid) handle.status() else null } catch (_: Exception) { null }
-                            val progress = status?.progress() ?: 0f
-                            val isFinished = (status?.isFinished ?: false) || progress >= 0.99f
+                    while (true) {
+                        value = withContext(Dispatchers.IO) {
+                            libraryBooks.map { b ->
+                                val s = database.playbackStateDao().getPlaybackState(b.infoHash)
+                                val handle = torrentEngine.getHandle(b.infoHash)
+                                val status = try { if (handle != null && handle.isValid) handle.status() else null } catch (_: Exception) { null }
+                                val progress = status?.progress() ?: 0f
+                                val isFinished = (status?.isFinished ?: false) || progress >= 0.99f
 
-                            com.bookzor.feature.library.ui.LibraryBookItem(
-                                book = b,
-                                state = s,
-                                isFullyDownloaded = isFinished,
-                                downloadProgress = progress
-                            )
+                                com.bookzor.feature.library.ui.LibraryBookItem(
+                                    book = b,
+                                    state = s,
+                                    isFullyDownloaded = isFinished,
+                                    downloadProgress = progress
+                                )
+                            }
                         }
+                        kotlinx.coroutines.delay(1000)
                     }
                 }
 
