@@ -31,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -80,7 +81,7 @@ fun LibraryScreen(
     }
 
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Box(
                 modifier = Modifier
@@ -311,7 +312,7 @@ fun LibraryBookCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF161616))
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { onPlay() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically

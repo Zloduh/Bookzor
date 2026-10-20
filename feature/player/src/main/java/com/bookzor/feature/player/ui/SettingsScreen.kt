@@ -97,7 +97,7 @@ fun SettingsScreen(
 
     Scaffold(
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
-        containerColor = Color.Black,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -305,7 +305,7 @@ fun SettingsScreen(
 fun SettingsSectionHeader(title: String) {
     Text(
         text = title.uppercase(),
-        color = Color(0xFFFF5722),
+        color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
         fontSize = 12.sp,
         letterSpacing = 1.5.sp,
@@ -319,7 +319,7 @@ fun SettingsCard(content: @Composable () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF181818))
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
     ) {
         content()
     }

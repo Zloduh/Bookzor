@@ -20,7 +20,7 @@ import com.bookzor.core.database.entity.PlaybackStateEntity
         PlaybackStateEntity::class,
         BookmarkEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class BookzorDatabase : RoomDatabase() {

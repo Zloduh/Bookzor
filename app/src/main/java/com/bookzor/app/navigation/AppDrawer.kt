@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 enum class DrawerDestination(val title: String, val icon: ImageVector) {
     PLAYER("Player", Icons.Default.PlayArrow),
     BOOKS("Books", Icons.AutoMirrored.Filled.MenuBook),
+    TO_READ("To-Read List", Icons.Default.BookmarkAdded),
     DISCOVER("Discover (ABB)", Icons.Default.Search),
     SLEEP_TIMER("Sleep timer", Icons.Default.Timer),
     BOOKMARKS("Bookmarks", Icons.Default.BookmarkBorder),
@@ -80,6 +82,7 @@ fun AppDrawerContent(
             val isSelected = when (destination) {
                 DrawerDestination.PLAYER -> currentRoute.startsWith("player")
                 DrawerDestination.BOOKS -> currentRoute == "library"
+                DrawerDestination.TO_READ -> currentRoute == "to_read"
                 DrawerDestination.DISCOVER -> currentRoute == "catalog"
                 DrawerDestination.SLEEP_TIMER -> currentRoute == "sleep_timer"
                 DrawerDestination.BOOKMARKS -> currentRoute == "all_bookmarks"
@@ -90,20 +93,20 @@ fun AppDrawerContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onNavigate(destination) }
-                    .background(if (isSelected) Color(0xFF241814) else Color.Transparent)
+                    .background(if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = destination.icon,
                     contentDescription = destination.title,
-                    tint = if (isSelected) Color(0xFFFF5722) else Color(0xFFD0D0D0),
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFFD0D0D0),
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(18.dp))
                 Text(
                     text = destination.title,
-                    color = if (isSelected) Color(0xFFFF5722) else Color.White,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     fontSize = 15.sp
                 )

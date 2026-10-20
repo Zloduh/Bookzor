@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -104,7 +105,7 @@ fun PlayerScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             // Header Bar matching IMG_4454: [ ☰ ]   [ ⏱ ]   [ 📖 ]
             Row(
@@ -404,7 +405,7 @@ fun OlegBookStrip(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onOpenLibrary() }
-            .background(Color(0xFF0F0F0F))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

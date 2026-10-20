@@ -67,10 +67,18 @@ fun CatalogRoute(
     onSubmitDirectMagnet: (String) -> Unit,
     onOpenLibrary: () -> Unit = {},
     recentBooks: List<RecentBookItem> = emptyList(),
+    initialQuery: String = "",
     viewModel: CatalogViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank() && initialQuery != state.query) {
+            viewModel.onQueryChange(initialQuery)
+            viewModel.search(initialQuery)
+        }
+    }
 
     CatalogScreen(
         state = state,
@@ -121,12 +129,12 @@ fun CatalogScreen(
     }
 
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             androidx.compose.material3.FloatingActionButton(
                 onClick = { showPasteDialog = true },
-                containerColor = Color(0xFFFF5722),
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape
             ) {
                 Icon(
@@ -380,7 +388,7 @@ fun BookCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF161616))
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { onClick() }
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically

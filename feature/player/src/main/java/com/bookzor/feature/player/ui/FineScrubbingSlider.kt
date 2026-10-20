@@ -47,6 +47,7 @@ fun FineScrubbingSlider(
 
     val safeDuration = if (durationMs > 0) durationMs else 1L
     val currentRatio = if (isDragging) dragProgress else (positionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Floating Scrubbing Rate Badge
@@ -154,7 +155,7 @@ fun FineScrubbingSlider(
                 // 3. Active Played Track
                 val playedWidth = canvasWidth * currentRatio
                 drawRoundRect(
-                    color = Color(0xFFFF5722), // Signature Terracotta Accent
+                    color = primaryColor,
                     topLeft = Offset(0f, yCenter - trackHeight / 2),
                     size = Size(playedWidth, trackHeight)
                 )

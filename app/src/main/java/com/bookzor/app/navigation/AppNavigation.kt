@@ -43,8 +43,11 @@ import kotlinx.coroutines.withContext
 
 sealed class Screen(val route: String) {
     data object Player : Screen("player")
-    data object Catalog : Screen("catalog")
+    data object Catalog : Screen("catalog?query={query}") {
+        fun createRoute(query: String = ""): String = "catalog?query=" + java.net.URLEncoder.encode(query, "UTF-8")
+    }
     data object Library : Screen("library")
+    data object ToRead : Screen("to_read")
     data object SleepTimer : Screen("sleep_timer")
     data object AllBookmarks : Screen("all_bookmarks")
     data object Settings : Screen("settings")
@@ -97,7 +100,8 @@ fun AppNavigation(
                                 popUpTo(Screen.Player.route) { inclusive = true }
                             }
                             DrawerDestination.BOOKS -> navController.navigate(Screen.Library.route)
-                            DrawerDestination.DISCOVER -> navController.navigate(Screen.Catalog.route)
+                            DrawerDestination.TO_READ -> navController.navigate(Screen.ToRead.route)
+                            DrawerDestination.DISCOVER -> navController.navigate(Screen.Catalog.createRoute())
                             DrawerDestination.SLEEP_TIMER -> navController.navigate(Screen.SleepTimer.route)
                             DrawerDestination.BOOKMARKS -> navController.navigate(Screen.AllBookmarks.route)
                             DrawerDestination.SETTINGS -> navController.navigate(Screen.Settings.route)
@@ -267,7 +271,15 @@ fun AppNavigation(
                 }
 
                 // --- 3. DISCOVER / SEARCH ON ABB ---
-                composable(Screen.Catalog.route) {
+                composable(
+                    route = "catalog?query={query}",
+                    arguments = listOf(navArgument("query") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    })
+                ) { backStackEntry ->
+                    val initialQuery = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("query") ?: "", "UTF-8")
+
                     val recentBooks by produceState<List<RecentBookItem>>(initialValue = emptyList(), allBooks) {
                         value = withContext(Dispatchers.IO) {
                             allBooks.mapNotNull { b ->
@@ -279,6 +291,7 @@ fun AppNavigation(
 
                     CatalogRoute(
                         recentBooks = recentBooks,
+                        initialQuery = initialQuery,
                         onOpenLibrary = { navController.navigate(Screen.Library.route) },
                         onBookClick = { detailUrl ->
                             navController.navigate(Screen.Detail.createRoute(detailUrl))
@@ -310,6 +323,43 @@ fun AppNavigation(
                                 navController.navigate(Screen.Detail.createRoute(input))
                             }
                         }
+                    )
+                }
+
+                // --- 4. TO-READ LIST SCREEN ---
+                composable(Screen.ToRead.route) {
+                    val toReadBooks by database.bookDao().observeToReadBooks().collectAsState(initial = emptyList())
+
+                    com.bookzor.feature.library.ui.ToReadScreen(
+                        books = toReadBooks,
+                        onStreamBook = { book ->
+                            scope.launch {
+                                val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                                playerController.playStream(
+                                    streamUrl = streamUrl,
+                                    infoHash = book.infoHash,
+                                    trackIndex = 0,
+                                    title = book.title,
+                                    artist = book.author
+                                )
+                                navController.navigate(Screen.Player.route)
+                            }
+                        },
+                        onPutInLibrary = { book ->
+                            scope.launch(Dispatchers.IO) {
+                                database.bookDao().setInLibrary(book.infoHash, true)
+                                database.bookDao().setDownloadRequested(book.infoHash, true)
+                                val magnet = com.bookzor.core.scraper.MagnetBuilder.build(book.infoHash, book.title)
+                                torrentEngine.downloadEntireBook(book.infoHash, magnet)
+                            }
+                        },
+                        onRemoveFromToRead = { book ->
+                            scope.launch(Dispatchers.IO) {
+                                database.bookDao().setToRead(book.infoHash, false)
+                            }
+                        },
+                        onNavigateToDiscover = { navController.navigate(Screen.Catalog.createRoute()) },
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
 
@@ -390,6 +440,14 @@ fun AppNavigation(
                                 database.bookDao().setInLibrary(infoHash, true)
                                 database.bookDao().setDownloadRequested(infoHash, true)
                                 torrentEngine.downloadEntireBook(infoHash, magnetUri)
+                            }
+                        },
+                        onSearchQuery = { query ->
+                            navController.navigate(Screen.Catalog.createRoute(query))
+                        },
+                        onToggleToRead = { infoHash, isToRead ->
+                            scope.launch(Dispatchers.IO) {
+                                database.bookDao().setToRead(infoHash, isToRead)
                             }
                         },
                         onNavigateBack = { navController.popBackStack() }

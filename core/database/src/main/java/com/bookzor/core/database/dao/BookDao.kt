@@ -25,8 +25,14 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE is_in_library = 1 ORDER BY last_accessed_at DESC")
     fun observeLibraryBooks(): Flow<List<BookEntity>>
 
+    @Query("SELECT * FROM books WHERE is_to_read = 1 ORDER BY created_at DESC")
+    fun observeToReadBooks(): Flow<List<BookEntity>>
+
     @Query("UPDATE books SET is_in_library = :inLibrary WHERE info_hash = :infoHash")
     suspend fun setInLibrary(infoHash: String, inLibrary: Boolean)
+
+    @Query("UPDATE books SET is_to_read = :toRead WHERE info_hash = :infoHash")
+    suspend fun setToRead(infoHash: String, toRead: Boolean)
 
     @Query("UPDATE books SET is_download_requested = :download WHERE info_hash = :infoHash")
     suspend fun setDownloadRequested(infoHash: String, download: Boolean)

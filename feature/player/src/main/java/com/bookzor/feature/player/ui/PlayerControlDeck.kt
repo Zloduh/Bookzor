@@ -60,7 +60,7 @@ fun OlegPlayerDeck(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(Color(0xFF141414))
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -153,13 +153,13 @@ fun OlegPlayerDeck(
                     modifier = Modifier
                         .size(60.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFF5722)),
+                        .background(androidx.compose.material3.MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
+                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(36.dp)
                     )
                 }

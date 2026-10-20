@@ -58,6 +58,8 @@ fun BookDetailRoute(
     detailUrl: String,
     onStreamClick: (String, String) -> Unit, // passes infoHash, magnetUri
     onPutInLibrary: (String, String) -> Unit, // passes infoHash, magnetUri
+    onSearchQuery: (String) -> Unit = {},
+    onToggleToRead: (String, Boolean) -> Unit = { _, _ -> },
     onNavigateBack: () -> Unit,
     viewModel: DetailViewModel = viewModel(),
     modifier: Modifier = Modifier
@@ -65,6 +67,7 @@ fun BookDetailRoute(
     val state by viewModel.uiState.collectAsState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    var isToRead by remember { mutableStateOf(false) }
 
     LaunchedEffect(detailUrl) {
         viewModel.loadBook(detailUrl)
@@ -72,7 +75,7 @@ fun BookDetailRoute(
 
     Scaffold(
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -84,12 +87,12 @@ fun BookDetailRoute(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
                 Text(
                     text = "Audiobook Details",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -108,7 +111,7 @@ fun BookDetailRoute(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        CircularProgressIndicator(color = Color(0xFFFF5722))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Fetching book details from ABB...", color = Color.Gray)
                     }
@@ -125,24 +128,36 @@ fun BookDetailRoute(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { viewModel.loadBook(detailUrl) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text("Retry")
                         }
                     }
                 }
                 state.bookDetail != null -> {
+                    val detail = state.bookDetail!!
                     BookDetailContent(
-                        detail = state.bookDetail!!,
+                        detail = detail,
+                        isToRead = isToRead,
                         onStreamClick = {
-                            onStreamClick(state.bookDetail!!.infoHash, state.bookDetail!!.magnetUri)
+                            onStreamClick(detail.infoHash, detail.magnetUri)
                         },
                         onPutInLibrary = {
-                            onPutInLibrary(state.bookDetail!!.infoHash, state.bookDetail!!.magnetUri)
+                            onPutInLibrary(detail.infoHash, detail.magnetUri)
                             scope.launch {
                                 snackbarHostState.showSnackbar("Added to Library. Downloading offline.")
                             }
-                        }
+                        },
+                        onToggleToRead = {
+                            isToRead = !isToRead
+                            onToggleToRead(detail.infoHash, isToRead)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (isToRead) "Added to To-Read List 🔖" else "Removed from To-Read List"
+                                )
+                            }
+                        },
+                        onSearchQuery = onSearchQuery
                     )
                 }
             }
@@ -153,8 +168,11 @@ fun BookDetailRoute(
 @Composable
 fun BookDetailContent(
     detail: BookDetail,
+    isToRead: Boolean = false,
     onStreamClick: () -> Unit,
     onPutInLibrary: () -> Unit,
+    onToggleToRead: () -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isInspectorExpanded by remember { mutableStateOf(false) }
@@ -172,7 +190,7 @@ fun BookDetailContent(
                     .width(110.dp)
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF222222)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (!detail.coverUrl.isNullOrEmpty()) {
@@ -192,24 +210,70 @@ fun BookDetailContent(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = detail.title,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+
+                // Clickable Author
                 Text(
                     text = "By ${detail.author}",
-                    color = Color(0xFFFF5722),
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable { onSearchQuery(detail.author) }
                 )
-                if (detail.narrator != null) {
+                val narrator = detail.narrator
+                if (!narrator.isNullOrBlank()) {
                     Text(
-                        text = "Read by ${detail.narrator}",
-                        color = Color.Gray,
-                        fontSize = 13.sp
+                        text = "Read by $narrator",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { onSearchQuery(narrator) }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Author & Narrator Discovery Chips
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { onSearchQuery(detail.author) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "👤 More by ${detail.author.take(15)}...",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            val narratorName = detail.narrator
+            if (!narratorName.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { onSearchQuery(narratorName) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎙️ Voice: ${narratorName.take(15)}...",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -239,40 +303,68 @@ fun BookDetailContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722)),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Stream Now (Sequential)",
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        androidx.compose.material3.OutlinedButton(
-            onClick = onPutInLibrary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF444444))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Download,
-                contentDescription = null,
-                tint = Color(0xFFFF5722)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Put in Library (Download for Offline)",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp
-            )
+            // Put in Library (Download Offline)
+            androidx.compose.material3.OutlinedButton(
+                onClick = onPutInLibrary,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Library (Offline)",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+            }
+
+            // To-Read / Want to Read Later
+            androidx.compose.material3.OutlinedButton(
+                onClick = onToggleToRead,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (isToRead) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    contentColor = if (isToRead) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (isToRead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text(
+                    text = if (isToRead) "✓ In To-Read" else "🔖 To-Read List",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -282,7 +374,7 @@ fun BookDetailContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF161616))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { isInspectorExpanded = !isInspectorExpanded }
                 .padding(14.dp)
         ) {
@@ -387,13 +479,13 @@ fun MetaPill(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1E1E1E))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Text(text = label, color = Color.Gray, fontSize = 10.sp)
         Text(
             text = value,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Medium,
             fontSize = 12.sp,
             maxLines = 1
