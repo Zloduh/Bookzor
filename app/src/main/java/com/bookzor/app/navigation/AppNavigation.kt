@@ -148,7 +148,21 @@ fun AppNavigation(
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onOpenSleepTimer = { navController.navigate(Screen.SleepTimer.route) },
                         onOpenBooksLibrary = { navController.navigate(Screen.Library.route) },
-                        onTogglePlayPause = { playerController.togglePlayPause() },
+                        onTogglePlayPause = {
+                            val infoHash = activeInfoHash ?: ""
+                            if (!playerController.hasMediaItem && infoHash.isNotEmpty()) {
+                                val streamUrl = streamServer.getStreamUrl(infoHash, playerState.currentTrackIndex)
+                                playerController.playStream(
+                                    streamUrl = streamUrl,
+                                    infoHash = infoHash,
+                                    trackIndex = playerState.currentTrackIndex,
+                                    title = activeBook?.title,
+                                    artist = activeBook?.author
+                                )
+                            } else {
+                                playerController.togglePlayPause()
+                            }
+                        },
                         onSeekChapter = { targetMs -> playerController.seekTo(targetMs) },
                         onJumpBack = { seconds -> playerController.jumpBack(seconds) },
                         onJumpForward = { seconds -> playerController.jumpForward(seconds) },

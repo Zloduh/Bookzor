@@ -21,6 +21,7 @@ class PlaybackService : MediaSessionService() {
         const val ACTION_REWIND = "com.bookzor.ACTION_REWIND"
         const val ACTION_PLAY_PAUSE = "com.bookzor.ACTION_PLAY_PAUSE"
         const val ACTION_FORWARD = "com.bookzor.ACTION_FORWARD"
+        const val ACTION_DISMISS = "com.bookzor.ACTION_DISMISS"
         const val NOTIFICATION_ID = 101
         const val CHANNEL_ID = "bookzor_audio_v2"
     }
@@ -80,23 +81,15 @@ class PlaybackService : MediaSessionService() {
                 }
             }
             ACTION_FORWARD -> player?.seekForward()
-        }
-
-        val notification = buildMediaNotification()
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+            ACTION_DISMISS -> {
+                player?.pause()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return START_NOT_STICKY
             }
-        } catch (e: Exception) {
-            android.util.Log.w("PlaybackService", "startForeground error: ${e.message}")
         }
 
+        updateNotification()
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -144,6 +137,12 @@ class PlaybackService : MediaSessionService() {
             Intent(this, PlaybackService::class.java).setAction(ACTION_FORWARD),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val deleteIntent = PendingIntent.getService(
+            this,
+            4,
+            Intent(this, PlaybackService::class.java).setAction(ACTION_DISMISS),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
 
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(
@@ -160,6 +159,7 @@ class PlaybackService : MediaSessionService() {
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
+            .setDeleteIntent(deleteIntent)
             .addAction(android.R.drawable.ic_media_rew, "Rewind 15s", rewindIntent)
             .addAction(
                 if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
@@ -183,10 +183,40 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun updateNotification() {
-        val nm = getSystemService(NotificationManager::class.java) ?: return
-        try {
-            nm.notify(NOTIFICATION_ID, buildMediaNotification())
-        } catch (_: Exception) {}
+        val player = mediaSession?.player
+        val isPlaying = player?.isPlaying == true
+        val notification = buildMediaNotification()
+
+        val nm = getSystemService(NotificationManager::class.java)
+        if (!isPlaying) {
+            // When paused, release the ongoing lock so the user can swipe the notification away!
+            stopForeground(STOP_FOREGROUND_DETACH)
+            nm?.notify(NOTIFICATION_ID, notification)
+        } else {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            } catch (e: Exception) {
+                nm?.notify(NOTIFICATION_ID, notification)
+            }
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        // Spotify/Audible model: If paused when user swipes app from Recents / Close All, kill the service completely
+        if (player == null || !player.isPlaying) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

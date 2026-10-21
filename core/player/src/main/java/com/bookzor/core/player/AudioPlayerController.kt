@@ -198,10 +198,16 @@ class AudioPlayerController(
         initLoudnessEnhancer()
     }
 
-    fun togglePlayPause() {
+    val hasMediaItem: Boolean get() = exoPlayer.currentMediaItem != null
+
+    fun togglePlayPause(onEmptyPlayer: (() -> Unit)? = null) {
         if (exoPlayer.isPlaying) {
             exoPlayer.pause()
         } else {
+            if (exoPlayer.currentMediaItem == null) {
+                onEmptyPlayer?.invoke()
+                return
+            }
             ensureServiceStarted()
             if (exoPlayer.playbackState == Player.STATE_IDLE) {
                 exoPlayer.prepare()
