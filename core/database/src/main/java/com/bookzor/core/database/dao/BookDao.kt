@@ -22,6 +22,15 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY last_accessed_at DESC")
     fun observeAllBooks(): Flow<List<BookEntity>>
 
+    @Query("SELECT * FROM books ORDER BY last_accessed_at DESC LIMIT 1")
+    suspend fun getMostRecentBook(): BookEntity?
+
+    @Query("SELECT * FROM books ORDER BY last_accessed_at DESC LIMIT 1")
+    fun observeMostRecentBook(): Flow<BookEntity?>
+
+    @Query("UPDATE books SET last_accessed_at = :timestamp WHERE info_hash = :infoHash")
+    suspend fun updateLastAccessed(infoHash: String, timestamp: Long = System.currentTimeMillis())
+
     @Query("SELECT * FROM books WHERE is_in_library = 1 ORDER BY last_accessed_at DESC")
     fun observeLibraryBooks(): Flow<List<BookEntity>>
 

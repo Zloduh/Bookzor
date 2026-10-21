@@ -76,14 +76,26 @@ fun AppNavigation(
     val isPlayerScreen = currentRoute == Screen.Player.route
 
     // Active playing or last accessed book
+    val latestPlaybackState by database.playbackStateDao().observeLatestPlaybackState().collectAsState(initial = null)
+    val mostRecentBook by database.bookDao().observeMostRecentBook().collectAsState(initial = null)
     val allBooks by database.bookDao().observeAllBooks().collectAsState(initial = emptyList())
-    val activeInfoHash = playerState.currentInfoHash ?: allBooks.firstOrNull()?.infoHash
+
+    val activeInfoHash = playerState.currentInfoHash
+        ?: latestPlaybackState?.infoHash
+        ?: mostRecentBook?.infoHash
+        ?: allBooks.firstOrNull()?.infoHash
 
     val activeBook by produceState<BookEntity?>(initialValue = null, activeInfoHash) {
         if (activeInfoHash != null) {
             value = withContext(Dispatchers.IO) { database.bookDao().getBook(activeInfoHash) }
         } else {
             value = null
+        }
+    }
+
+    LaunchedEffect(activeInfoHash) {
+        if (activeInfoHash != null && playerState.currentInfoHash != activeInfoHash) {
+            playerController.loadBookState(activeInfoHash)
         }
     }
 
@@ -151,11 +163,14 @@ fun AppNavigation(
                         onTogglePlayPause = {
                             val infoHash = activeInfoHash ?: ""
                             if (!playerController.hasMediaItem && infoHash.isNotEmpty()) {
-                                val streamUrl = streamServer.getStreamUrl(infoHash, playerState.currentTrackIndex)
+                                val trackIdx = playerState.currentTrackIndex
+                                val posMs = playerState.currentPositionMs
+                                val streamUrl = streamServer.getStreamUrl(infoHash, trackIdx)
                                 playerController.playStream(
                                     streamUrl = streamUrl,
                                     infoHash = infoHash,
-                                    trackIndex = playerState.currentTrackIndex,
+                                    trackIndex = trackIdx,
+                                    startPositionMs = posMs,
                                     title = activeBook?.title,
                                     artist = activeBook?.author
                                 )
@@ -248,11 +263,17 @@ fun AppNavigation(
                         books = libraryItems,
                         onPlayBook = { book ->
                             scope.launch {
-                                val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                                val savedState = withContext(Dispatchers.IO) {
+                                    database.playbackStateDao().getPlaybackState(book.infoHash)
+                                }
+                                val trackIdx = savedState?.currentTrackIndex ?: 0
+                                val posMs = savedState?.positionMs ?: 0L
+                                val streamUrl = streamServer.getStreamUrl(book.infoHash, trackIdx)
                                 playerController.playStream(
                                     streamUrl = streamUrl,
                                     infoHash = book.infoHash,
-                                    trackIndex = 0,
+                                    trackIndex = trackIdx,
+                                    startPositionMs = posMs,
                                     title = book.title,
                                     artist = book.author
                                 )
@@ -350,11 +371,17 @@ fun AppNavigation(
                         books = toReadBooks,
                         onStreamBook = { book ->
                             scope.launch {
-                                val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                                val savedState = withContext(Dispatchers.IO) {
+                                    database.playbackStateDao().getPlaybackState(book.infoHash)
+                                }
+                                val trackIdx = savedState?.currentTrackIndex ?: 0
+                                val posMs = savedState?.positionMs ?: 0L
+                                val streamUrl = streamServer.getStreamUrl(book.infoHash, trackIdx)
                                 playerController.playStream(
                                     streamUrl = streamUrl,
                                     infoHash = book.infoHash,
-                                    trackIndex = 0,
+                                    trackIndex = trackIdx,
+                                    startPositionMs = posMs,
                                     title = book.title,
                                     artist = book.author
                                 )

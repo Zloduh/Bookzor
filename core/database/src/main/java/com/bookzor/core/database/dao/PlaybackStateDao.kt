@@ -18,6 +18,12 @@ interface PlaybackStateDao {
     @Query("SELECT * FROM playback_state WHERE info_hash = :infoHash")
     fun observePlaybackState(infoHash: String): Flow<PlaybackStateEntity?>
 
+    @Query("SELECT * FROM playback_state ORDER BY updated_at DESC LIMIT 1")
+    suspend fun getLatestPlaybackState(): PlaybackStateEntity?
+
+    @Query("SELECT * FROM playback_state ORDER BY updated_at DESC LIMIT 1")
+    fun observeLatestPlaybackState(): Flow<PlaybackStateEntity?>
+
     @Query("UPDATE playback_state SET position_ms = :positionMs, updated_at = :updatedAt WHERE info_hash = :infoHash")
     suspend fun updatePosition(infoHash: String, positionMs: Long, updatedAt: Long = System.currentTimeMillis())
 }

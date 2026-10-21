@@ -36,6 +36,7 @@ data class PlayerState(
 class AudioPlayerController(
     private val context: Context,
     private val playbackStateDao: PlaybackStateDao? = null,
+    private val bookDao: com.bookzor.core.database.dao.BookDao? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ) {
     companion object {
@@ -79,6 +80,22 @@ class AudioPlayerController(
 
     init {
         instance = this
+
+        // Restore latest saved state from DB on launch so the app reopens to the last played book & position
+        scope.launch(Dispatchers.IO) {
+            val latest = playbackStateDao?.getLatestPlaybackState()
+            if (latest != null) {
+                activeInfoHash = latest.infoHash
+                _playerState.value = _playerState.value.copy(
+                    currentInfoHash = latest.infoHash,
+                    currentTrackIndex = latest.currentTrackIndex,
+                    currentPositionMs = latest.positionMs,
+                    playbackSpeed = latest.playbackSpeed,
+                    volumeBoostMb = latest.volumeBoostMb
+                )
+            }
+        }
+
         exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _playerState.value = _playerState.value.copy(isPlaying = isPlaying)
@@ -157,6 +174,10 @@ class AudioPlayerController(
     ) {
         ensureServiceStarted()
         activeInfoHash = infoHash
+
+        scope.launch(Dispatchers.IO) {
+            bookDao?.updateLastAccessed(infoHash)
+        }
 
         // Calculate Smart Rewind if resuming after pause
         var finalStartPos = startPositionMs
@@ -304,10 +325,34 @@ class AudioPlayerController(
         }
     }
 
-    private fun saveCurrentState() {
+    fun loadBookState(infoHash: String) {
+        if (activeInfoHash == infoHash && exoPlayer.isPlaying) return
+        activeInfoHash = infoHash
+        scope.launch(Dispatchers.IO) {
+            val saved = playbackStateDao?.getPlaybackState(infoHash)
+            if (saved != null) {
+                _playerState.value = _playerState.value.copy(
+                    currentInfoHash = infoHash,
+                    currentTrackIndex = saved.currentTrackIndex,
+                    currentPositionMs = saved.positionMs,
+                    playbackSpeed = saved.playbackSpeed,
+                    volumeBoostMb = saved.volumeBoostMb
+                )
+            } else {
+                _playerState.value = _playerState.value.copy(
+                    currentInfoHash = infoHash,
+                    currentTrackIndex = 0,
+                    currentPositionMs = 0L
+                )
+            }
+            bookDao?.updateLastAccessed(infoHash)
+        }
+    }
+
+    fun saveCurrentState() {
         val hash = activeInfoHash ?: return
         val dao = playbackStateDao ?: return
-        val currentPos = maxOf(0L, exoPlayer.currentPosition)
+        val currentPos = if (exoPlayer.currentPosition > 0) exoPlayer.currentPosition else _playerState.value.currentPositionMs
         val speed = _playerState.value.playbackSpeed
         val boost = _playerState.value.volumeBoostMb
         val trackIdx = _playerState.value.currentTrackIndex
@@ -323,6 +368,7 @@ class AudioPlayerController(
                     updatedAt = System.currentTimeMillis()
                 )
             )
+            bookDao?.updateLastAccessed(hash)
         }
     }
 

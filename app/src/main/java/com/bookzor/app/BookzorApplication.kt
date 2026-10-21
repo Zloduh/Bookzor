@@ -24,7 +24,8 @@ class BookzorApplication : Application() {
         streamServer = TorrentStreamServer(torrentEngine, initialPort = 8080)
         playerController = AudioPlayerController(
             context = this,
-            playbackStateDao = database.playbackStateDao()
+            playbackStateDao = database.playbackStateDao(),
+            bookDao = database.bookDao()
         )
     }
 }
