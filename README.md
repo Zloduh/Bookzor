@@ -1,99 +1,96 @@
 # Bookzor 🎧
 
-An Android audiobook player that streams books directly from **AudioBookBay (ABB)** magnet links, pairing a sequential BitTorrent streaming engine with the UX and control ergonomics of benchmark players (specifically modeled after the UX principles of *MP3 Audiobook Player Pro* by Oleg Brailean).
+An Android audiobook player that streams audiobooks directly from **AudioBookBay (ABB)** magnet links, pairing an embedded sequential BitTorrent streaming engine with the UX and control ergonomics modeled after *MP3 Audiobook Player Pro* by Oleg Brailean.
 
 ---
 
-## 🎯 Core Concept
+## 🎯 Core Features
 
-Instead of forcing users to download gigabytes of audio files before listening, **Bookzor**:
-1. Scrapes and searches ABB directly inside the app (no manual magnet copying, no browser ads).
-2. Extracts info hashes and trackers to construct valid magnet URIs dynamically.
-3. Streams the torrent sequentially via an embedded torrent engine bridged to a local HTTP loopback server (`127.0.0.1:port`).
-4. Feeds Android's native `Media3 / ExoPlayer` with standard HTTP `Range` requests, enabling instant playback (cold-start < 15 seconds) and arbitrary scrubbing.
-5. Emulates the high-precision audio control deck of *MP3 Audiobook Player Pro*: dual progress bars (book vs chapter), fine scrubbing, volume/loudness enhancer, customizable jump intervals, sleep timer with shake-to-reset, and full offline retention of streamed chunks.
+- **ABB Direct Streaming & Search:**
+  - In-app search for titles, authors, and narrators (`&tt=1` normalization).
+  - Mirror failover (`audiobookbay.lu`, `audiobookbay.is`, etc.) with direct magnet link parsing.
+  - Zero browser navigation, captcha bypass, and advertisement suppression.
+- **Sequential BitTorrent Streaming:**
+  - Embedded `libtorrent4j` (C++ / JNI) engine targeting `arm64-v8a`.
+  - Sequential piece prioritization and embedded local HTTP 1.1 Range loopback server (`TorrentStreamServer`).
+  - Native `Media3 / ExoPlayer` integration enabling instantaneous scrubbing and sub-15s cold starts.
+- **Oleg Brailean Ergonomic Control Deck:**
+  - Center cover canvas with double-tap Play/Pause toggle.
+  - Fine-scrubbing progress bar with dual jump buttons (independent forward and rewind intervals).
+  - Chapter and track side drawer with live progress indicators.
+  - In-player **Bookmarks Drawer**: jump to timestamps, view/delete bookmarks, and add bookmarks with custom notes.
+  - Playback speed control (0.5x – 3.0x) and hardware-accelerated Loudness Enhancer (+0dB to +12dB).
+  - Sleep timer with countdown and shake-to-reset.
+- **State Persistence & Rehydration:**
+  - Persistent SQLite storage via Room (`BookEntity`, `AudioTrackEntity`, `PlaybackStateEntity`, `BookmarkEntity`).
+  - Cold starts immediately restore the exact last-played book, chapter, and position without resetting to track zero.
+- **Spotify / Audible Lifecycle Management:**
+  - Runs as an Android Foreground Service (`PlaybackService` with `MediaStyle` notification).
+  - Swiping the app away from "Close all" while listening **maintains uninterrupted audio playback**.
+  - When paused, swiping the app away or dismissing the notification terminates the service and frees system memory.
+- **Selective Offline Downloads & Storage Meter:**
+  - Selective chapter/file download checkboxes on compilation torrents to prevent filling tablet storage.
+  - Reactive storage meter and cache cleaner in Settings that terminates handles and deletes orphaned audio files.
+- **Themes & UI Customization:**
+  - Three OLED and reader themes: **OLED Dark**, **Warm Sepia**, and **Midnight Blue**.
+  - Persistent bottom mini-player across all auxiliary screens.
 
 ---
 
-## 🏗️ Architecture at a Glance
+## 🏗️ Architecture & Modules
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       Jetpack Compose UI                    │
-│  [Catalog / Search]  [Book Detail]  [Oleg-Style Player Deck] │
-└──────────────┬───────────────────────────────┬──────────────┘
-               │                               │
-               ▼                               ▼
-    ┌──────────────────────┐      ┌───────────────────────────┐
-    │     Scraper Engine   │      │       Player ViewModel    │
-    │  - Jsoup HTML Parser │      │  - MediaControllerCompat  │
-    │  - Dynamic Domain    │      │  - Dual Progress State    │
-    │  - InfoHash & Tracker│      │  - Fine Scrubbing Logic   │
-    └──────────┬───────────┘      └─────────────┬─────────────┘
-               │ Magnet URI                     │
-               ▼                                ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │                  Background Audio Service               │
-    │           (Media3 MediaSessionService + ExoPlayer)       │
-    │  - Lockscreen / Notification / Headset / BT Controls     │
-    │  - LoudnessEnhancer Audio Effect                        │
-    │  - Persistent Playback State (Room DB)                  │
-    └──────────────────────────┬──────────────────────────────┘
-                               │ HTTP Range Requests
-                               ▼ (http://127.0.0.1:8080/stream/...)
-    ┌─────────────────────────────────────────────────────────┐
-    │             Local Torrent Streaming Engine              │
-    │                  (libtorrent4j C++ / JNI)               │
-    │  - DHT, PEX, Tracker communication                      │
-    │  - Sequential piece prioritization engine                │
-    │  - Embedded HTTP 1.1 Range Server (Ktor / NanoHTTPD)    │
-    │  - Smart persistent cache (Streamed audio stays offline)│
-    └─────────────────────────────────────────────────────────┘
+├── app/                  # Main entry point, navigation graph, application setup
+├── core/
+│   ├── common/           # Dispatchers, resource wrappers, theme management
+│   ├── database/         # Room DB, entities (Books, Tracks, Bookmarks, PlaybackState), DAOs
+│   ├── player/           # ExoPlayer controller, PlaybackService (MediaSessionService), audio effects
+│   ├── scraper/          # ABB HTML parser (Jsoup), domain failover, magnet URI generator
+│   └── torrent/          # libtorrent4j session, piece prioritizer, HTTP Range server
+└── feature/
+    ├── catalog/          # ABB discovery, search screen, direct magnet input dialog
+    ├── detail/           # Book inspection, selective file download list, torrent metadata
+    ├── library/          # Local library, Listen Later ("To Read") shelf, global bookmarks manager
+    └── player/           # Portrait & landscape Oleg Brailean player deck, sheets, settings
 ```
 
 ---
 
-## 📚 Project Documentation
+## 📱 Target Platform & Testing
 
-The documentation is organized for autonomous AI agents and human developers:
-
-1. **[`ENVIRONMENT_SETUP.md`](./ENVIRONMENT_SETUP.md)**:
-   - Development machine setup (Android Studio vs CLI on Linux/CachyOS/Arch, macOS, Windows).
-   - JDK 17/21 installation.
-   - Physical device debugging setup (specifically for attached Samsung Galaxy Tab A7 / `SM-T505`).
-   - Terminal build, install, and logcat commands.
-
-2. **[`REQUIREMENTS.md`](./REQUIREMENTS.md)**:
-   - Detailed functional requirements (Scraper, Torrent Engine, Audio Player, UI/UX, Library).
-   - Non-functional requirements (Cold start time, battery, memory, storage limits).
-   - Edge cases & failure modes (Cloudflare, zero seeds, moov atom at EOF, multi-file MP3s).
-
-3. **[`ARCHITECTURE.md`](./ARCHITECTURE.md)**:
-   - Multi-module gradle structure (`core:scraper`, `core:torrent`, `core:player`, `core:database`, `feature:*`).
-   - Complete Room Database entity schemas.
-   - Torrent-to-HTTP Range streaming pipeline specification.
-   - Oleg Brailean UI control deck specification.
-
-4. **[`ROADMAP_AND_EPICS.md`](./ROADMAP_AND_EPICS.md)**:
-   - Complete project breakdown: **7 Epics**, broken into discrete user stories and granular, checkable tasks.
-   - Step-by-step guidance designed so a junior engineer or autonomous agent can execute tasks without ambiguity.
+- **Target Device:** Samsung Galaxy Tab A7 (`SM-T505`, Android 12, `arm64-v8a`).
+- **SDK Target:** Minimum SDK 26, Target SDK 34.
+- **Local APK Path:** `/home/tpredrag/Desktop/Bookzor.apk` (strictly local builds, no cloud releases).
 
 ---
 
-## 🚀 Quick Start for Developers
-
-To verify your environment and attached device:
+## 🚀 Build & Install Commands
 
 ```bash
-# Check connected Android device (Samsung Tablet)
+# Check device connection
 adb devices
 
 # Build debug APK
 ./gradlew assembleDebug
 
-# Install on connected tablet
+# Deploy to connected device
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
-# Follow logs
+# Launch MainActivity
+adb shell am start -n com.bookzor.app/.MainActivity
+
+# Mirror APK to Desktop
+cp app/build/outputs/apk/debug/app-debug.apk /home/tpredrag/Desktop/Bookzor.apk
+
+# Live log inspection
 adb logcat -s BookzorTorrent BookzorPlayer BookzorScraper
 ```
+
+---
+
+## 📚 Technical Documentation
+
+- **[`REQUIREMENTS.md`](./REQUIREMENTS.md):** Functional specifications, non-functional constraints, and edge-case protocols.
+- **[`ARCHITECTURE.md`](./ARCHITECTURE.md):** Database schemas, audio pipeline, and inter-module contracts.
+- **[`ROADMAP_AND_EPICS.md`](./ROADMAP_AND_EPICS.md):** Epics, user stories, and execution checklists.
+- **[`UI_DESIGN_SPEC.md`](./UI_DESIGN_SPEC.md):** Oleg Brailean layout measurements, typography, and color tokens.
