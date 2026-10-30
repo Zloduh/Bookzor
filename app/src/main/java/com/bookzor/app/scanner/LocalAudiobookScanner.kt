@@ -7,7 +7,6 @@ import com.bookzor.core.database.BookzorDatabase
 import com.bookzor.core.database.entity.AudioTrackEntity
 import com.bookzor.core.database.entity.BookEntity
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -24,10 +23,14 @@ class LocalAudiobookScanner(
     }
 
     suspend fun scan() = withContext(Dispatchers.IO) {
+        Log.i(TAG, "Starting scan() in ${storageDir.absolutePath}")
         if (!storageDir.exists() || !storageDir.isDirectory) {
             Log.d(TAG, "Storage directory not ready: ${storageDir.absolutePath}")
             return@withContext
         }
+
+        // 1. First deduplicate any existing books sharing the same audio files or titles
+        deduplicateBooks()
 
         val entries = storageDir.listFiles() ?: return@withContext
         Log.i(TAG, "Scanning ${entries.size} entries in ${storageDir.absolutePath} for audiobooks...")
@@ -43,6 +46,9 @@ class LocalAudiobookScanner(
                 Log.w(TAG, "Error scanning ${entry.name}: ${e.message}")
             }
         }
+
+        // 2. Run deduplication once more after scan to eliminate any generated ghost copies
+        deduplicateBooks()
     }
 
     private suspend fun scanBookDirectory(dir: File) {
@@ -53,22 +59,40 @@ class LocalAudiobookScanner(
 
         if (audioFiles.isEmpty()) return
 
-        val bookTitle = dir.name
+        // Check if an existing book in the database matches this directory or any of its files
+        val existingBook = findExistingBookForDirectory(dir, audioFiles)
 
-        // Check if an existing book in the database matches this directory name
-        val allBooks = database.bookDao().observeAllBooks().firstOrNull() ?: emptyList()
-        val matchingBook = allBooks.firstOrNull { 
-            it.title.equals(bookTitle, ignoreCase = true) || it.infoHash.equals(bookTitle, ignoreCase = true)
+        if (existingBook != null) {
+            Log.i(TAG, "Directory '${dir.name}' matches existing book '${existingBook.title}' (${existingBook.infoHash})")
+            database.bookDao().setInLibrary(existingBook.infoHash, true)
+            database.bookDao().setDownloadRequested(existingBook.infoHash, false)
+
+            // Update track paths so streamServer can find files locally
+            val existingTracks = database.audioTrackDao().getTracks(existingBook.infoHash)
+            if (existingTracks.isEmpty()) {
+                val trackEntities = audioFiles.mapIndexed { idx, file ->
+                    AudioTrackEntity(
+                        id = "${existingBook.infoHash}_$idx",
+                        infoHash = existingBook.infoHash,
+                        trackIndex = idx,
+                        fileName = file.relativeTo(storageDir).path,
+                        fileSizeBytes = file.length(),
+                        durationMs = 0L
+                    )
+                }
+                database.audioTrackDao().insertTracks(trackEntities)
+            }
+            return
         }
 
-        val infoHash = matchingBook?.infoHash ?: generateHash("dir_${dir.name.lowercase()}")
+        // Brand-new manual book not previously in DB
+        val infoHash = generateHash("dir_${dir.name.lowercase()}")
         val existing = database.bookDao().getBook(infoHash)
 
-        var author = matchingBook?.author ?: "Local Library"
-        var coverPath: String? = matchingBook?.coverUrl
+        var author = "Local Library"
+        var coverPath: String? = null
         var totalDuration = 0L
 
-        // Check if a cover image already exists in the folder
         val localCover = dir.listFiles()?.firstOrNull {
             it.isFile && it.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp")
         }
@@ -79,11 +103,9 @@ class LocalAudiobookScanner(
         val mmr = MediaMetadataRetriever()
         try {
             mmr.setDataSource(audioFiles.first().absolutePath)
-            if (author == "Local Library") {
-                author = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                    ?: mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
-                    ?: "Local Library"
-            }
+            author = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                ?: mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+                ?: "Local Library"
 
             if (coverPath == null) {
                 val pic = mmr.embeddedPicture
@@ -109,15 +131,15 @@ class LocalAudiobookScanner(
 
         val book = BookEntity(
             infoHash = infoHash,
-            title = matchingBook?.title ?: existing?.title ?: bookTitle,
+            title = existing?.title ?: dir.name,
             author = author,
-            narrator = matchingBook?.narrator ?: existing?.narrator,
+            narrator = existing?.narrator,
             coverUrl = coverPath ?: existing?.coverUrl,
-            description = matchingBook?.description ?: existing?.description ?: "Audiobook in Download/Audiobooks/${dir.name}",
+            description = existing?.description ?: "Local audiobook in Download/Audiobooks/${dir.name}",
             format = format,
-            isAbridged = matchingBook?.isAbridged ?: false,
+            isAbridged = false,
             totalSizeBytes = totalSize,
-            totalDurationMs = if (totalDuration > 0) totalDuration else (matchingBook?.totalDurationMs ?: 0L),
+            totalDurationMs = totalDuration,
             sourceUrl = dir.absolutePath,
             isInLibrary = true,
             isDownloadRequested = false,
@@ -127,21 +149,45 @@ class LocalAudiobookScanner(
         database.bookDao().insertOrUpdate(book)
 
         val trackEntities = audioFiles.mapIndexed { idx, file ->
-            val relPath = file.relativeTo(storageDir).path
             AudioTrackEntity(
                 id = "${infoHash}_$idx",
                 infoHash = infoHash,
                 trackIndex = idx,
-                fileName = relPath,
+                fileName = file.relativeTo(storageDir).path,
                 fileSizeBytes = file.length(),
                 durationMs = 0L
             )
         }
         database.audioTrackDao().insertTracks(trackEntities)
-        Log.i(TAG, "Indexed audiobook '${book.title}' with ${trackEntities.size} tracks (${totalSize / (1024 * 1024)} MB)")
+        Log.i(TAG, "Indexed manual audiobook '${book.title}' with ${trackEntities.size} tracks (${totalSize / (1024 * 1024)} MB)")
     }
 
     private suspend fun scanSingleAudioFile(file: File) {
+        // Check if an existing book in the database already claims this file
+        val existingBook = findExistingBookForFile(file)
+
+        if (existingBook != null) {
+            Log.i(TAG, "File '${file.name}' matches existing book '${existingBook.title}' (${existingBook.infoHash})")
+            database.bookDao().setInLibrary(existingBook.infoHash, true)
+            database.bookDao().setDownloadRequested(existingBook.infoHash, false)
+
+            // Ensure track fileName points to this file
+            val existingTracks = database.audioTrackDao().getTracks(existingBook.infoHash)
+            if (existingTracks.isEmpty()) {
+                val track = AudioTrackEntity(
+                    id = "${existingBook.infoHash}_0",
+                    infoHash = existingBook.infoHash,
+                    trackIndex = 0,
+                    fileName = file.name,
+                    fileSizeBytes = file.length(),
+                    durationMs = 0L
+                )
+                database.audioTrackDao().insertTracks(listOf(track))
+            }
+            return
+        }
+
+        // Brand-new manual single-file book not in DB
         val title = file.nameWithoutExtension
         val infoHash = generateHash("file_${file.name.lowercase()}")
         val existing = database.bookDao().getBook(infoHash)
@@ -196,6 +242,101 @@ class LocalAudiobookScanner(
         )
         database.audioTrackDao().insertTracks(listOf(track))
         Log.i(TAG, "Indexed single-file audiobook '${book.title}' (${file.length() / (1024 * 1024)} MB)")
+    }
+
+    private suspend fun findExistingBookForFile(file: File): BookEntity? {
+        val track = database.audioTrackDao().findTrackByFileName(file.name)
+        if (track != null) {
+            val book = database.bookDao().getBook(track.infoHash)
+            if (book != null && !book.infoHash.startsWith("file_") && !book.infoHash.startsWith("dir_")) {
+                return book
+            }
+        }
+
+        val allBooks = database.bookDao().getAllBooks()
+        val cleanName = cleanTitle(file.nameWithoutExtension)
+        if (cleanName.length >= 3) {
+            return allBooks.firstOrNull {
+                if (it.infoHash.startsWith("file_") || it.infoHash.startsWith("dir_")) return@firstOrNull false
+                val cleanBook = cleanTitle(it.title)
+                cleanBook.isNotEmpty() && (cleanBook.contains(cleanName) || cleanName.contains(cleanBook))
+            }
+        }
+        return null
+    }
+
+    private suspend fun findExistingBookForDirectory(dir: File, audioFiles: List<File>): BookEntity? {
+        for (f in audioFiles) {
+            val track = database.audioTrackDao().findTrackByFileName(f.name)
+            if (track != null) {
+                val book = database.bookDao().getBook(track.infoHash)
+                if (book != null && !book.infoHash.startsWith("file_") && !book.infoHash.startsWith("dir_")) {
+                    return book
+                }
+            }
+        }
+
+        val allBooks = database.bookDao().getAllBooks()
+        val cleanDir = cleanTitle(dir.name)
+        if (cleanDir.length >= 3) {
+            return allBooks.firstOrNull {
+                if (it.infoHash.startsWith("file_") || it.infoHash.startsWith("dir_")) return@firstOrNull false
+                val cleanBook = cleanTitle(it.title)
+                cleanBook.isNotEmpty() && (cleanBook.contains(cleanDir) || cleanDir.contains(cleanBook))
+            }
+        }
+        return null
+    }
+
+    private suspend fun deduplicateBooks() {
+        val allTracks = database.audioTrackDao().getAllTracks()
+
+        // 1. Deduplicate by identical audio file name
+        val tracksByFile = allTracks.groupBy { File(it.fileName).name.lowercase() }
+        for ((_, tracks) in tracksByFile) {
+            val infoHashes = tracks.map { it.infoHash }.distinct()
+            if (infoHashes.size > 1) {
+                val books = infoHashes.mapNotNull { database.bookDao().getBook(it) }
+                // Prefer the original ABB book (has coverUrl or does NOT start with file_/dir_)
+                val primary = books.firstOrNull { !it.coverUrl.isNullOrEmpty() }
+                    ?: books.firstOrNull { !it.infoHash.startsWith("file_") && !it.infoHash.startsWith("dir_") }
+                    ?: books.first()
+
+                for (b in books) {
+                    if (b.infoHash != primary.infoHash) {
+                        Log.i(TAG, "Deduplicating: Removing duplicate book '${b.title}' (${b.infoHash}) in favor of '${primary.title}' (${primary.infoHash})")
+                        database.bookDao().deleteBook(b.infoHash)
+                    }
+                }
+            }
+        }
+
+        // 2. Deduplicate by matching title
+        val currentBooks = database.bookDao().getAllBooks()
+        val booksByTitle = currentBooks.groupBy { cleanTitle(it.title) }
+        for ((cleanTitle, books) in booksByTitle) {
+            if (cleanTitle.isNotEmpty() && books.size > 1) {
+                val primary = books.firstOrNull { !it.coverUrl.isNullOrEmpty() }
+                    ?: books.firstOrNull { !it.infoHash.startsWith("file_") && !it.infoHash.startsWith("dir_") }
+                    ?: books.first()
+
+                for (b in books) {
+                    if (b.infoHash != primary.infoHash) {
+                        Log.i(TAG, "Deduplicating: Removing title duplicate '${b.title}' (${b.infoHash}) in favor of '${primary.title}' (${primary.infoHash})")
+                        database.bookDao().deleteBook(b.infoHash)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cleanTitle(raw: String): String {
+        return raw.lowercase()
+            .replace(Regex("\\[.*?\\]"), "")
+            .replace(Regex("\\(.*?\\)"), "")
+            .replace(Regex("[^a-z0-9]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun isAudioFile(file: File): Boolean {

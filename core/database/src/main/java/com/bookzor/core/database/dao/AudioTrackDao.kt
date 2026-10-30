@@ -17,4 +17,10 @@ interface AudioTrackDao {
 
     @Query("SELECT * FROM audio_tracks WHERE info_hash = :infoHash ORDER BY track_index ASC")
     fun observeTracks(infoHash: String): Flow<List<AudioTrackEntity>>
+
+    @Query("SELECT * FROM audio_tracks")
+    suspend fun getAllTracks(): List<AudioTrackEntity>
+
+    @Query("SELECT * FROM audio_tracks WHERE file_name = :fileName OR file_name LIKE '%' || :fileName LIMIT 1")
+    suspend fun findTrackByFileName(fileName: String): AudioTrackEntity?
 }
