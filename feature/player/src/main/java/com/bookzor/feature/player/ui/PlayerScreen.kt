@@ -88,6 +88,8 @@ fun PlayerScreen(
     onBookmark: () -> Unit,
     onAddBookmarkWithNote: (String?) -> Unit = {},
     onDeleteBookmark: (BookmarkEntity) -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
+    onOpenBookDetail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -169,10 +171,18 @@ fun PlayerScreen(
                             book = book,
                             totalDurationMs = book?.totalDurationMs ?: 0L,
                             elapsedMs = positionMs,
-                            onOpenLibrary = onOpenBooksLibrary
+                            onOpenLibrary = onOpenBooksLibrary,
+                            onSearchQuery = onSearchQuery
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        // Discovery Chips for Author & Narrator
+                        BookAuthorNarratorChips(
+                            book = book,
+                            onSearchQuery = onSearchQuery,
+                            onOpenBookDetail = onOpenBookDetail
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         PlayerCoverArt(
                             coverUrl = book?.coverUrl,
@@ -248,7 +258,15 @@ fun PlayerScreen(
                         book = book,
                         totalDurationMs = book?.totalDurationMs ?: 0L,
                         elapsedMs = positionMs,
-                        onOpenLibrary = onOpenBooksLibrary
+                        onOpenLibrary = onOpenBooksLibrary,
+                        onSearchQuery = onSearchQuery
+                    )
+
+                    // Discovery Chips for Author & Narrator
+                    BookAuthorNarratorChips(
+                        book = book,
+                        onSearchQuery = onSearchQuery,
+                        onOpenBookDetail = onOpenBookDetail
                     )
 
                     // 2. Center Area: Cover Art OR "Please select audiobook"
@@ -389,6 +407,7 @@ fun OlegBookStrip(
     totalDurationMs: Long,
     elapsedMs: Long,
     onOpenLibrary: () -> Unit,
+    onSearchQuery: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val durationText = formatDuration(totalDurationMs)
@@ -435,6 +454,34 @@ fun OlegBookStrip(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            val author = book?.author
+            val narrator = book?.narrator
+            if (!author.isNullOrBlank() && author != "Local Library") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "By $author",
+                        color = Color(0xFFFF8A65),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onSearchQuery(author) }
+                    )
+                    if (!narrator.isNullOrBlank()) {
+                        Text(
+                            text = " • 🎙️ $narrator",
+                            color = Color(0xFF90CAF9),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { onSearchQuery(narrator) }
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -468,6 +515,82 @@ fun OlegBookStrip(
                 tint = Color.Gray,
                 modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun BookAuthorNarratorChips(
+    book: BookEntity?,
+    onSearchQuery: (String) -> Unit,
+    onOpenBookDetail: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    if (book == null) return
+    val author = book.author
+    val narrator = book.narrator
+    val hasAuthor = author.isNotBlank() && author != "Local Library"
+    val hasNarrator = !narrator.isNullOrBlank()
+
+    if (hasAuthor || hasNarrator) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (hasAuthor) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF242424))
+                        .clickable { onSearchQuery(author) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "👤 More by ${author.take(18)}${if (author.length > 18) "..." else ""}",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            if (hasNarrator) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF242424))
+                        .clickable { onSearchQuery(narrator!!) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎙️ Voice: ${narrator!!.take(18)}${if (narrator.length > 18) "..." else ""}",
+                        color = Color(0xFFFF5722),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            if (book.sourceUrl.startsWith("http")) {
+                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF1E1E1E))
+                        .clickable { onOpenBookDetail(book.sourceUrl) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "ℹ️ Details",
+                        color = Color.LightGray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }

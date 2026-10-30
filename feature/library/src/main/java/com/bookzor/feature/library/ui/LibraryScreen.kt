@@ -22,9 +22,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,6 +36,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,16 +73,34 @@ fun LibraryScreen(
     onPlayBookmark: (BookEntity, Long) -> Unit = { b, _ -> onPlayBook(b) },
     onDownloadBook: (BookEntity) -> Unit,
     onDeleteBook: (BookEntity) -> Unit,
+    onSearchQuery: (String) -> Unit = {},
+    onOpenBookDetail: (String) -> Unit = {},
     onNavigateToDiscover: () -> Unit,
     onNavigateBack: () -> Unit = onNavigateToDiscover,
     modifier: Modifier = Modifier
 ) {
     var bookToDelete by remember { mutableStateOf<BookEntity?>(null) }
     var selectedBookBookmarks by remember { mutableStateOf<Pair<BookEntity, List<com.bookzor.core.database.entity.BookmarkEntity>>?>(null) }
+    var selectedBookForDetails by remember { mutableStateOf<BookEntity?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchVisible by remember { mutableStateOf(false) }
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val availableSpaceGb = remember {
         val freeBytes = context.filesDir.usableSpace
         freeBytes.toFloat() / (1024 * 1024 * 1024)
+    }
+
+    val displayBooks = remember(books, searchQuery) {
+        if (searchQuery.isBlank()) books
+        else {
+            val q = searchQuery.trim().lowercase()
+            books.filter { item ->
+                item.book.title.lowercase().contains(q) ||
+                item.book.author.lowercase().contains(q) ||
+                (item.book.narrator?.lowercase()?.contains(q) == true)
+            }
+        }
     }
 
     Scaffold(
@@ -99,34 +122,78 @@ fun LibraryScreen(
             }
         },
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
+            if (isSearchVisible) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Filter title, author, actor...", color = Color.Gray, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFFFF5722))
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (searchQuery.isNotEmpty()) searchQuery = ""
+                                else isSearchVisible = false
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray)
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFFFF5722),
+                            unfocusedBorderColor = Color(0xFF333333),
+                            focusedContainerColor = Color(0xFF161616),
+                            unfocusedContainerColor = Color(0xFF161616)
+                        )
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "BOOKS",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = onNavigateToDiscover) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Add,
-                        contentDescription = "Add Audiobook",
-                        tint = Color.White
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "BOOKS (${books.size})",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        letterSpacing = 1.sp
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { isSearchVisible = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search Books",
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(onClick = onNavigateToDiscover) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                            contentDescription = "Add Audiobook",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
@@ -168,13 +235,76 @@ fun LibraryScreen(
                         Text("Discover Audiobooks")
                     }
                 }
+            } else if (displayBooks.isEmpty() && searchQuery.isNotBlank()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("🔍", fontSize = 44.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "No local books found for \"$searchQuery\"",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Search AudioBookBay to find and download books by this author or actor.",
+                        color = Color.Gray,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { onSearchQuery(searchQuery.trim()) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Search AudioBookBay for \"${searchQuery.trim()}\"")
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(books) { item ->
+                    if (searchQuery.isNotBlank()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF26201C))
+                                    .clickable { onSearchQuery(searchQuery.trim()) }
+                                    .padding(14.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🔎", fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Search AudioBookBay for \"${searchQuery.trim()}\"",
+                                            color = Color(0xFFFF5722),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = "Find more books online by this author, actor, or title",
+                                            color = Color.LightGray,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    items(displayBooks) { item ->
                         LibraryBookCard(
                             item = item,
                             onPlay = { onPlayBook(item.book) },
@@ -182,6 +312,14 @@ fun LibraryScreen(
                             onDelete = { bookToDelete = item.book },
                             onOpenBookmarks = {
                                 selectedBookBookmarks = item.book to item.bookmarks
+                            },
+                            onSearchQuery = onSearchQuery,
+                            onOpenDetails = {
+                                if (item.book.sourceUrl.startsWith("http")) {
+                                    onOpenBookDetail(item.book.sourceUrl)
+                                } else {
+                                    selectedBookForDetails = item.book
+                                }
                             }
                         )
                     }
@@ -251,6 +389,71 @@ fun LibraryScreen(
         )
     }
 
+    // Book Details & Discovery Dialog for local books
+    if (selectedBookForDetails != null) {
+        val target = selectedBookForDetails!!
+        AlertDialog(
+            onDismissRequest = { selectedBookForDetails = null },
+            containerColor = Color(0xFF1E1E1E),
+            title = {
+                Text(text = target.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    val narrator = target.narrator
+                    if (target.author.isNotBlank() && target.author != "Local Library") {
+                        Text(text = "Author: ${target.author}", color = Color.LightGray, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    if (!narrator.isNullOrBlank()) {
+                        Text(text = "Narrator / Actor: $narrator", color = Color(0xFF64B5F6), fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(text = "Format: ${target.format}", color = Color.Gray, fontSize = 12.sp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "Search AudioBookBay:", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (target.author.isNotBlank() && target.author != "Local Library") {
+                        Button(
+                            onClick = {
+                                onSearchQuery(target.author)
+                                selectedBookForDetails = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E2E2E)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("👤 More books by ${target.author}", color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    if (!narrator.isNullOrBlank()) {
+                        Button(
+                            onClick = {
+                                onSearchQuery(narrator)
+                                selectedBookForDetails = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E2E2E)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🎙️ More books read by $narrator", color = Color(0xFFFF5722))
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                OutlinedButton(onClick = { selectedBookForDetails = null }) {
+                    Text("Close", color = Color.LightGray)
+                }
+            }
+        )
+    }
+
     // Confirmation dialog before deleting book files
     if (bookToDelete != null) {
         val target = bookToDelete!!
@@ -294,6 +497,8 @@ fun LibraryBookCard(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onOpenBookmarks: () -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
+    onOpenDetails: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val book = item.book
@@ -349,13 +554,30 @@ fun LibraryBookCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = book.author,
-                color = Color.Gray,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            val narrator = book.narrator
+            Row(
+                modifier = Modifier.padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "By ${book.author}",
+                    color = Color(0xFFFF8A65),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable { onSearchQuery(book.author) }
+                )
+                if (!narrator.isNullOrBlank()) {
+                    Text(
+                        text = " • 🎙️ $narrator",
+                        color = Color(0xFF90CAF9),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onSearchQuery(narrator) }
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -425,6 +647,50 @@ fun LibraryBookCard(
                 }
             }
 
+            // Quick Discovery Chips: Author & Narrator
+            val hasAuthor = book.author.isNotBlank() && book.author != "Local Library"
+            val hasNarrator = !narrator.isNullOrBlank()
+            if (hasAuthor || hasNarrator) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (hasAuthor) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF242424))
+                                .clickable { onSearchQuery(book.author) }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "👤 ${book.author.take(14)}${if (book.author.length > 14) "..." else ""}",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    if (hasNarrator) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF242424))
+                                .clickable { onSearchQuery(narrator!!) }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "🎙️ ${narrator!!.take(14)}${if (narrator.length > 14) "..." else ""}",
+                                color = Color(0xFFFF7043),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
             // Download Progress Line (if still downloading)
             if (!item.isFullyDownloaded && book.isDownloadRequested) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -451,7 +717,7 @@ fun LibraryBookCard(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Action Buttons: Play + Download / Delete
+        // Action Buttons: Play + Info/Details + Delete
         IconButton(onClick = onPlay) {
             Box(
                 modifier = Modifier
@@ -467,6 +733,15 @@ fun LibraryBookCard(
                     modifier = Modifier.size(22.dp)
                 )
             }
+        }
+
+        IconButton(onClick = onOpenDetails) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = "Details & Search",
+                tint = Color.LightGray,
+                modifier = Modifier.size(20.dp)
+            )
         }
 
         IconButton(onClick = onDelete) {

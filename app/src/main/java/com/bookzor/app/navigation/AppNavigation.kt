@@ -239,6 +239,12 @@ fun AppNavigation(
                         },
                         onDeleteBookmark = { bookmark ->
                             scope.launch { database.bookmarkDao().deleteBookmark(bookmark) }
+                        },
+                        onSearchQuery = { query ->
+                            navController.navigate(Screen.Catalog.createRoute(query))
+                        },
+                        onOpenBookDetail = { detailUrl ->
+                            navController.navigate(Screen.Detail.createRoute(detailUrl))
                         }
                     )
                 }
@@ -326,6 +332,12 @@ fun AppNavigation(
                                 database.bookDao().setInLibrary(book.infoHash, false)
                                 database.bookDao().deleteBook(book.infoHash)
                             }
+                        },
+                        onSearchQuery = { query ->
+                            navController.navigate(Screen.Catalog.createRoute(query))
+                        },
+                        onOpenBookDetail = { detailUrl ->
+                            navController.navigate(Screen.Detail.createRoute(detailUrl))
                         },
                         onNavigateToDiscover = { navController.navigate(Screen.Catalog.route) },
                         onNavigateBack = { navController.popBackStack() }
