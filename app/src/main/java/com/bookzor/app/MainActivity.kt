@@ -47,11 +47,21 @@ class MainActivity : ComponentActivity() {
         streamServer = app.streamServer
         playerController = app.playerController
 
-        // Start torrent engine and server in background
+        checkStoragePermission()
+
+        // Start torrent engine, server, and local audiobook scanner in background
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 torrentEngine.start()
                 streamServer.start()
+
+                // Scan Download/Audiobooks for existing and user-placed books
+                val scanner = com.bookzor.app.scanner.LocalAudiobookScanner(
+                    context = applicationContext,
+                    database = database,
+                    storageDir = torrentEngine.storageDir
+                )
+                scanner.scan()
 
                 // Resume all books marked for offline download in library
                 val libraryBooks = database.bookDao().observeAllBooks()
@@ -97,5 +107,44 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+    }
+
+    private fun checkStoragePermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            if (!android.os.Environment.isExternalStorageManager()) {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (_: Exception) {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val permissions = arrayOf(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+            requestPermissions(permissions, 1001)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::torrentEngine.isInitialized && ::database.isInitialized) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    com.bookzor.app.scanner.LocalAudiobookScanner(
+                        context = applicationContext,
+                        database = database,
+                        storageDir = torrentEngine.storageDir
+                    ).scan()
+                } catch (_: Exception) {}
+            }
+        }
     }
 }

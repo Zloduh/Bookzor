@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class TorrentEngine(
-    val context: Context
+    val context: Context,
+    var fileResolver: (suspend (infoHash: String, fileIndex: Int) -> File?)? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val sessionManager = SessionManager()
@@ -31,7 +32,16 @@ class TorrentEngine(
     private val schedulers = ConcurrentHashMap<String, PiecePriorityScheduler>()
 
     val storageDir: File by lazy {
-        File(context.filesDir, "audiobooks").apply { if (!exists()) mkdirs() }
+        val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val audiobooksDir = File(publicDownloads, "Audiobooks")
+        if (!audiobooksDir.exists()) {
+            try { audiobooksDir.mkdirs() } catch (_: Exception) {}
+        }
+        if (audiobooksDir.exists() && audiobooksDir.canWrite()) {
+            audiobooksDir
+        } else {
+            File(context.filesDir, "audiobooks").apply { if (!exists()) mkdirs() }
+        }
     }
 
     fun start() {
@@ -160,6 +170,30 @@ class TorrentEngine(
         return handle
     }
 
+    suspend fun findAudioFile(infoHash: String, fileIndex: Int): File? {
+        val cleanHash = infoHash.lowercase()
+
+        // 1. Try file resolver (e.g. database query for audio tracks)
+        val resolved = try { fileResolver?.invoke(cleanHash, fileIndex) } catch (_: Exception) { null }
+        if (resolved != null && resolved.exists() && resolved.isFile && resolved.length() > 0) {
+            return resolved
+        }
+
+        // 2. Check active torrent handle
+        val handle = getHandle(cleanHash)
+        if (handle != null && handle.isValid) {
+            val tf = try { handle.torrentFile() } catch (_: Exception) { null }
+            if (tf != null && tf.isValid && fileIndex in 0 until tf.numFiles()) {
+                val candidate = File(storageDir, tf.files().filePath(fileIndex))
+                if (candidate.exists() && candidate.isFile && candidate.length() > 0) {
+                    return candidate
+                }
+            }
+        }
+
+        return null
+    }
+
     fun deleteTorrentAndFiles(infoHash: String) {
         val cleanHash = infoHash.lowercase()
         val handle = getHandle(cleanHash)
@@ -181,6 +215,22 @@ class TorrentEngine(
                 }
             } catch (e: Exception) {
                 android.util.Log.w("BookzorTorrent", "Error deleting torrent: ${e.message}")
+            }
+        } else {
+            // Delete manual/local files if no handle exists
+            try {
+                scope.launch {
+                    val resolved = fileResolver?.invoke(cleanHash, 0)
+                    if (resolved != null && resolved.exists()) {
+                        if (resolved.parentFile != null && resolved.parentFile != storageDir && resolved.parentFile?.exists() == true) {
+                            resolved.parentFile?.deleteRecursively()
+                        } else {
+                            resolved.delete()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("BookzorTorrent", "Error deleting local files: ${e.message}")
             }
         }
 

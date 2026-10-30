@@ -35,7 +35,23 @@ class BookzorApplication : Application() {
         }
 
         database = BookzorDatabase.getInstance(this)
-        torrentEngine = TorrentEngine(this)
+        torrentEngine = TorrentEngine(this).apply {
+            fileResolver = { hash, idx ->
+                val tracks = database.audioTrackDao().getTracks(hash)
+                val track = tracks.getOrNull(idx)
+                if (track != null) {
+                    val candidate = java.io.File(storageDir, track.fileName)
+                    if (candidate.exists() && candidate.isFile && candidate.length() > 0) {
+                        candidate
+                    } else {
+                        val absCandidate = java.io.File(track.fileName)
+                        if (absCandidate.exists() && absCandidate.isFile && absCandidate.length() > 0) {
+                            absCandidate
+                        } else null
+                    }
+                } else null
+            }
+        }
         streamServer = TorrentStreamServer(torrentEngine, initialPort = 8080)
         playerController = AudioPlayerController(
             context = this,

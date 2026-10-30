@@ -234,6 +234,19 @@ fun AppNavigation(
 
                 // --- 2. BOOKS / LIBRARY SCREEN ---
                 composable(Screen.Library.route) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    LaunchedEffect(Unit) {
+                        withContext(Dispatchers.IO) {
+                            try {
+                                com.bookzor.app.scanner.LocalAudiobookScanner(
+                                    context = context,
+                                    database = database,
+                                    storageDir = torrentEngine.storageDir
+                                ).scan()
+                            } catch (_: Exception) {}
+                        }
+                    }
+
                     val libraryBooks by database.bookDao().observeLibraryBooks().collectAsState(initial = emptyList())
                     val libraryItems by produceState<List<LibraryBookItem>>(initialValue = emptyList(), libraryBooks) {
                         while (true) {
@@ -243,14 +256,15 @@ fun AppNavigation(
                                     val handle = torrentEngine.getHandle(b.infoHash)
                                     val status = try { if (handle != null && handle.isValid) handle.status() else null } catch (_: Exception) { null }
                                     val progress = status?.progress() ?: 0f
-                                    val isFinished = (status?.isFinished ?: false) || progress >= 0.99f
+                                    val hasLocalFile = torrentEngine.findAudioFile(b.infoHash, 0) != null
+                                    val isFinished = (status?.isFinished ?: false) || progress >= 0.99f || hasLocalFile
                                     val marks = database.bookmarkDao().getBookmarks(b.infoHash)
 
                                     LibraryBookItem(
                                         book = b,
                                         state = s,
                                         isFullyDownloaded = isFinished,
-                                        downloadProgress = progress,
+                                        downloadProgress = if (hasLocalFile && progress < 0.99f) 1.0f else progress,
                                         bookmarks = marks
                                     )
                                 }

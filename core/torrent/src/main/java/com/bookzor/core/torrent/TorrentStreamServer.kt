@@ -137,6 +137,13 @@ class TorrentStreamServer(
                 }
                 val fileIndex = queryParams["fileIndex"]?.toIntOrNull() ?: 0
 
+                // Check if file is already present on local disk (downloaded previously or placed by user)
+                val directFile = torrentEngine.findAudioFile(infoHash, fileIndex)
+                if (directFile != null && directFile.exists() && directFile.length() > 0) {
+                    serveLocalFile(output, method, directFile, rangeHeader)
+                    return@withContext
+                }
+
                 // Wait up to 30 seconds for metadata if not ready yet
                 var handle = torrentEngine.getHandle(infoHash)
                 var attempts = 0
@@ -281,5 +288,64 @@ class TorrentStreamServer(
     private fun sendRangeNotSatisfiable(output: BufferedOutputStream, totalSize: Long) {
         output.write("HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */$totalSize\r\nConnection: close\r\n\r\n".toByteArray())
         output.flush()
+    }
+
+    private suspend fun serveLocalFile(
+        output: BufferedOutputStream,
+        method: String,
+        targetFile: File,
+        rangeHeader: String?
+    ) = withContext(Dispatchers.IO) {
+        val totalFileSize = targetFile.length()
+        var startByte = 0L
+        var endByte = totalFileSize - 1
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            val rangeSpec = rangeHeader.removePrefix("bytes=").trim()
+            val rangeParts = rangeSpec.split("-")
+            startByte = rangeParts[0].toLongOrNull() ?: 0L
+            endByte = rangeParts.getOrNull(1)?.toLongOrNull() ?: (totalFileSize - 1)
+        }
+
+        if (startByte > endByte || startByte >= totalFileSize) {
+            sendRangeNotSatisfiable(output, totalFileSize)
+            return@withContext
+        }
+
+        val contentLength = endByte - startByte + 1
+        val mimeType = when {
+            targetFile.name.endsWith(".m4b", ignoreCase = true) || targetFile.name.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+            targetFile.name.endsWith(".mp3", ignoreCase = true) -> "audio/mpeg"
+            targetFile.name.endsWith(".opus", ignoreCase = true) || targetFile.name.endsWith(".ogg", ignoreCase = true) -> "audio/ogg"
+            targetFile.name.endsWith(".flac", ignoreCase = true) -> "audio/flac"
+            else -> "application/octet-stream"
+        }
+
+        output.write("HTTP/1.1 206 Partial Content\r\n".toByteArray())
+        output.write("Content-Type: $mimeType\r\n".toByteArray())
+        output.write("Accept-Ranges: bytes\r\n".toByteArray())
+        output.write("Content-Range: bytes $startByte-$endByte/$totalFileSize\r\n".toByteArray())
+        output.write("Content-Length: $contentLength\r\n".toByteArray())
+        output.write("Connection: close\r\n".toByteArray())
+        output.write("\r\n".toByteArray())
+        output.flush()
+
+        if (method.equals("HEAD", ignoreCase = true)) {
+            return@withContext
+        }
+
+        RandomAccessFile(targetFile, "r").use { raf ->
+            raf.seek(startByte)
+            val buffer = ByteArray(64 * 1024)
+            var bytesRemaining = contentLength
+            while (bytesRemaining > 0 && isRunning.get()) {
+                val bytesToRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
+                val bytesRead = raf.read(buffer, 0, bytesToRead)
+                if (bytesRead == -1) break
+                output.write(buffer, 0, bytesRead)
+                bytesRemaining -= bytesRead
+            }
+            output.flush()
+        }
     }
 }
