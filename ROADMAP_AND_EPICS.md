@@ -344,3 +344,125 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
   - **Acceptance Criteria:**
     - [ ] Streamed books show accurate cached percentage.
     - [ ] Clearing cache frees disk space while preserving bookmark and resume positions.
+
+
+---
+
+## 📁 Epic 8: Public Storage Architecture & Reinstall Resilience
+
+### Story 8.1: Migrate Audiobook Storage to Public Android Directory
+**As an** audiobook listener,  
+**I want** my audiobooks saved to `/storage/emulated/0/Download/Audiobooks/`,  
+**So that** my downloaded books survive app updates, reinstalls, and clear-cache actions, and allow sideloading via USB.
+
+#### Tasks:
+
+- [x] **Task 8.1.1: Switch Storage Directory in TorrentEngine & Scanner**
+  - **Path:** `core/torrent/src/main/java/com/bookzor/core/torrent/TorrentEngine.kt`, `app/src/main/java/com/bookzor/app/MainActivity.kt`
+  - **Details:**
+    - Switch `storageDir` from app-private internal sandbox to `File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Audiobooks")`.
+    - Auto-create directory with proper file read/write permissions.
+- [x] **Task 8.1.2: Add Android 11+ MANAGE_EXTERNAL_STORAGE Support**
+  - **Path:** `app/src/main/AndroidManifest.xml`, `MainActivity.kt`
+  - **Details:**
+    - Declare `android.permission.MANAGE_EXTERNAL_STORAGE`.
+    - Implement `checkStoragePermission()` to verify `Environment.isExternalStorageManager()` and launch `Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` intent when ungranted.
+
+---
+
+## 🤖 Epic 9: Local Audiobook Auto-Scanner & Deduplication
+
+### Story 9.1: Auto-Scan and Deduplicate Books
+**As an** audiobook listener,  
+**I want** the app to automatically detect audiobooks placed on my device, match them to AudioBookBay parent entries, and eliminate duplicate cards,  
+**So that** I see a single book entry with rich cover thumbnails and chapter progress.
+
+#### Tasks:
+
+- [x] **Task 9.1.1: Build LocalAudiobookScanner**
+  - **Path:** `app/src/main/java/com/bookzor/app/scanner/LocalAudiobookScanner.kt`
+  - **Details:**
+    - Scan directory recursively for audio files (`.m4b`, `.mp3`, `.m4a`, etc.).
+    - Extract ID3/M4B tags (title, artist, duration, embedded cover art) via `MediaMetadataRetriever`.
+    - Query `AudioTrackDao.findTrackByFileName` to detect if the file belongs to an existing AudioBookBay book.
+    - If matched, set `isInLibrary = true`, register track paths, and retain the original cover art and metadata.
+- [x] **Task 9.1.2: Implement Two-Pass Deduplication Engine**
+  - **Path:** `app/src/main/java/com/bookzor/app/scanner/LocalAudiobookScanner.kt`
+  - **Details:**
+    - Detect multiple book entities in Room DB referencing the exact same audio file on disk or having matching normalized titles.
+    - Keep the primary book with cover art (`!coverUrl.isNullOrEmpty()`) and delete the bare ghost duplicate.
+    - Run deduplication before and after scanning.
+
+---
+
+## 🔄 Epic 10: In-App Auto-Updater & Wireless Deployments
+
+### Story 10.1: Self-Updating APK via GitHub Releases
+**As a** tablet user without developer tools or USB cables,  
+**I want** the app to check for updates and update itself in-app,  
+**So that** I always have the latest bug fixes and features effortlessly.
+
+#### Tasks:
+
+- [x] **Task 10.1.1: Build AppUpdateManager**
+  - **Path:** `app/src/main/java/com/bookzor/app/updater/AppUpdateManager.kt`
+  - **Details:**
+    - Query GitHub API for latest release on `Zloduh/bookzor-releases`.
+    - Compare version names semantically (`isVersionNewer`).
+    - Stream APK download to cache directory with progress reporting.
+- [x] **Task 10.1.2: Android Package Installer Integration**
+  - **Path:** `app/src/main/java/com/bookzor/app/updater/AppUpdateManager.kt`, `app/src/main/res/xml/file_paths.xml`
+  - **Details:**
+    - Expose cached APK via `FileProvider`.
+    - Request `canRequestPackageInstalls()` permission on Android 8.0+.
+    - Launch `Intent.ACTION_VIEW` package installer intent.
+- [x] **Task 10.1.3: Update UI in Settings**
+  - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/SettingsScreen.kt`
+  - **Details:**
+    - Add "Check for Updates" tile showing current version name.
+    - Show update modal with changelog, download progress bar (MB and %), and "Install Update" action.
+
+---
+
+## 📋 Epic 11: In-App Diagnostics & Log Collector
+
+### Story 11.1: One-Tap Diagnostic Log Export
+**As a** user experiencing an issue,  
+**I want** to export diagnostic logs and crash traces as a zip file,  
+**So that** I can share it with the developer via any installed app (Email, Drive, Telegram).
+
+#### Tasks:
+
+- [x] **Task 11.1.1: Implement LogCollector**
+  - **Path:** `app/src/main/java/com/bookzor/app/diagnostics/LogCollector.kt`
+  - **Details:**
+    - Capture device specs, memory statistics, storage availability, and the last 500 lines of logcat.
+    - Compress into `bookzor_logs_<timestamp>.zip`.
+    - Trigger Android native share sheet using `Intent.ACTION_SEND` and `FileProvider`.
+- [x] **Task 11.1.2: Add "Export Logs" Tile in Settings**
+  - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/SettingsScreen.kt`
+  - **Details:**
+    - "Export Diagnostic Logs" button that triggers `LogCollector.collectAndShare(context)`.
+
+---
+
+## 🔎 Epic 12: Author & Actor/Narrator Discovery Search
+
+### Story 12.1: Discover Related Books by Author and Narrator
+**As an** audiobook listener,  
+**I want** to tap an author or narrator's name anywhere in the library or player,  
+**So that** I can instantly find all their audiobooks on AudioBookBay.
+
+#### Tasks:
+
+- [x] **Task 12.1.1: Player Screen Discovery Chips & Interactive Metadata**
+  - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/PlayerScreen.kt`
+  - **Details:**
+    - Make author and narrator text in `OlegBookStrip` clickable to search AudioBookBay.
+    - Add `BookAuthorNarratorChips` bar below the top strip with `👤 More by [Author]`, `🎙️ Voice: [Narrator]`, and `ℹ️ Details`.
+- [x] **Task 12.1.2: Library Screen Discovery & Real-Time Filter**
+  - **Path:** `feature/library/src/main/java/com/bookzor/feature/library/ui/LibraryScreen.kt`
+  - **Details:**
+    - Add clickable author and narrator links and quick chips on each `LibraryBookCard`.
+    - Add `ℹ️ Details` modal with one-tap online search buttons for both author and narrator.
+    - Add real-time search bar in the Library top bar to filter local books with one-tap fallback to AudioBookBay online search.

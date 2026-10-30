@@ -133,3 +133,62 @@ Modeled directly after **MP3 Audiobook Player Pro** (Oleg Brailean), adapted for
 On tablet screens (width >= 600dp), the UI switches to a **Split-View Canvas**:
 - **Left Column (45% width):** Large Cover Art + Book Metadata + Overall Progress + Chapter Progress & Control Deck.
 - **Right Column (55% width):** Persistent Chapter/Track List + Bookmarks Tab + Torrent Swarm Stats (Seeds, Leechers, Download Rate, Cached Chunks).
+
+
+---
+
+### 2.4. Discovery Chips & Interactive Author / Narrator Links
+
+Modeled for immediate exploration of related works without manual typing:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [ 👤 More by Brandon Sanderson ]  [ 🎙️ Voice: Michael Kramer ]│
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **Player Screen Placement:** Positioned directly beneath `OlegBookStrip` on both phone portrait and tablet split-view layouts.
+- **Library Card Placement:** Positioned directly below format and offline badges on every `LibraryBookCard`.
+- **Interactive Details Modal:** Tapping `ℹ️` on any library card displays a modal with book cover, format, duration, and one-tap action buttons:
+  - `[ 👤 More books by <Author> ]`
+  - `[ 🎙️ More books read by <Narrator> ]`
+
+---
+
+### 2.5. Real-Time Library Search & Web Fallback
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [ ← ] [ 🔍 Filter title, author, actor... ]          [ ✕ ] │
+├─────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ 🔎 Search AudioBookBay for "<query>"                  │  │
+│  │ Find more books online by this author, actor or title │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Live interactive filtering as you type across all local audiobooks.
+- Prominent orange accent banner at the top of the list allowing instant search of AudioBookBay for that exact query.
+
+---
+
+### 2.6. In-App Update Dialog (Settings Screen)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Update Available                                           │
+├─────────────────────────────────────────────────────────────┤
+│  A new version of Bookzor is available.                     │
+│  Version: 1.0.2 (Current: 1.0.1)                            │
+│                                                             │
+│  What's New:                                                │
+│  • Added search by Author and Actor from Library & Player   │
+│  • Real-time library search bar                             │
+│                                                             │
+│  Downloading: 42.5 MB / 69.2 MB (61%)                       │
+│  [━━━━━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░░░░░]                │
+├─────────────────────────────────────────────────────────────┤
+│                         [ Cancel ]    [ Download & Install ]│
+└─────────────────────────────────────────────────────────────┘
+```
