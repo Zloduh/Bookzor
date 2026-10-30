@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
@@ -64,6 +66,8 @@ fun SettingsScreen(
     domainManager: DomainManager,
     cacheDir: File,
     onClearAllCache: () -> Unit,
+    onShareLogs: () -> Unit = {},
+    onCheckUpdates: () -> Unit = {},
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -216,7 +220,27 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // --- 5. ABOUT ---
+            // --- 5. UPDATES & DIAGNOSTICS ---
+            SettingsSectionHeader("Updates & Diagnostics")
+            SettingsCard {
+                SettingsClickableRow(
+                    icon = Icons.Default.SystemUpdate,
+                    title = "Check for Updates",
+                    subtitle = "Search for new releases on GitHub",
+                    onClick = onCheckUpdates
+                )
+                Divider(color = Color(0xFF282828))
+                SettingsClickableRow(
+                    icon = Icons.Default.Share,
+                    title = "Share Diagnostic Logs",
+                    subtitle = "Export compressed log archive for debugging",
+                    onClick = onShareLogs
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // --- 6. ABOUT ---
             SettingsSectionHeader("About")
             SettingsCard {
                 Row(

@@ -1,11 +1,19 @@
 package com.bookzor.app.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -509,6 +520,9 @@ fun AppNavigation(
                 // --- 7. SETTINGS SCREEN ---
                 composable(Screen.Settings.route) {
                     val domainManager = remember { com.bookzor.core.scraper.DomainManager() }
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val updateManager = remember { com.bookzor.app.updater.AppUpdateManager(context) }
+                    val updateStatus by updateManager.status.collectAsState()
 
                     com.bookzor.feature.player.ui.SettingsScreen(
                         domainManager = domainManager,
@@ -525,8 +539,144 @@ fun AppNavigation(
                                 database.bookDao().resetAllDownloadFlags()
                             }
                         },
+                        onShareLogs = {
+                            scope.launch {
+                                com.bookzor.app.diagnostics.LogCollector.collectAndShareLogs(context)
+                            }
+                        },
+                        onCheckUpdates = {
+                            scope.launch {
+                                updateManager.checkForUpdates()
+                            }
+                        },
                         onNavigateBack = { navController.popBackStack() }
                     )
+
+                    // Update Dialogs
+                    when (val status = updateStatus) {
+                        is com.bookzor.app.updater.UpdateStatus.Checking -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = {},
+                                containerColor = Color(0xFF1E1E1E),
+                                title = { Text("Checking for Updates...", color = Color.White) },
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    ) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = Color(0xFF00E676),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Text("Contacting GitHub Releases...", color = Color.LightGray, fontSize = 14.sp)
+                                    }
+                                },
+                                confirmButton = {}
+                            )
+                        }
+                        is com.bookzor.app.updater.UpdateStatus.Available -> {
+                            val info = status.updateInfo
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { updateManager.resetStatus() },
+                                containerColor = Color(0xFF1E1E1E),
+                                title = {
+                                    Text(
+                                        text = "Update Available: v${info.versionName}",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = info.releaseTitle,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(text = info.changelog, color = Color.LightGray, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        val mb = info.sizeBytes.toFloat() / (1024 * 1024)
+                                        if (mb > 0) {
+                                            Text(
+                                                text = "Size: ${String.format("%.1f", mb)} MB",
+                                                color = Color.Gray,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    androidx.compose.material3.Button(
+                                        onClick = { scope.launch { updateManager.downloadAndInstall(info) } },
+                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF00E676)
+                                        )
+                                    ) {
+                                        Text("Download & Install", color = Color.Black, fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                                dismissButton = {
+                                    androidx.compose.material3.OutlinedButton(onClick = { updateManager.resetStatus() }) {
+                                        Text("Later", color = Color.LightGray)
+                                    }
+                                }
+                            )
+                        }
+                        is com.bookzor.app.updater.UpdateStatus.Downloading -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = {},
+                                containerColor = Color(0xFF1E1E1E),
+                                title = { Text("Downloading Update...", color = Color.White, fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Column {
+                                        androidx.compose.material3.LinearProgressIndicator(
+                                            progress = status.progress,
+                                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                                            color = Color(0xFF00E676)
+                                        )
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text(
+                                            text = "${String.format("%.1f", status.downloadedMb)} MB / ${String.format("%.1f", status.totalMb)} MB (${(status.progress * 100).toInt()}%)",
+                                            color = Color.LightGray,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                },
+                                confirmButton = {}
+                            )
+                        }
+                        is com.bookzor.app.updater.UpdateStatus.UpToDate -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { updateManager.resetStatus() },
+                                containerColor = Color(0xFF1E1E1E),
+                                title = { Text("You're Up to Date!", color = Color.White, fontWeight = FontWeight.Bold) },
+                                text = { Text("Bookzor is already running the latest version (v${updateManager.currentVersion}).", color = Color.LightGray) },
+                                confirmButton = {
+                                    androidx.compose.material3.Button(onClick = { updateManager.resetStatus() }) {
+                                        Text("OK")
+                                    }
+                                }
+                            )
+                        }
+                        is com.bookzor.app.updater.UpdateStatus.Error -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { updateManager.resetStatus() },
+                                containerColor = Color(0xFF1E1E1E),
+                                title = { Text("Update Check", color = Color.White, fontWeight = FontWeight.Bold) },
+                                text = { Text(status.message, color = Color.LightGray) },
+                                confirmButton = {
+                                    androidx.compose.material3.Button(onClick = { updateManager.resetStatus() }) {
+                                        Text("OK")
+                                    }
+                                }
+                            )
+                        }
+                        else -> {}
+                    }
                 }
             }
 
