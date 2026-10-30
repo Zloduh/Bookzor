@@ -89,6 +89,22 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        // Always satisfy Android's startForegroundService contract immediately on start command
+        val notification = buildMediaNotification()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PlaybackService", "startForeground onStartCommand error: ${e.message}")
+        }
+
         updateNotification()
         return super.onStartCommand(intent, flags, startId)
     }

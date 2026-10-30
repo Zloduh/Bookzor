@@ -46,23 +46,30 @@ class MainActivity : ComponentActivity() {
         torrentEngine = app.torrentEngine
         streamServer = app.streamServer
         playerController = app.playerController
-        playerController.ensureServiceStarted()
 
         // Start torrent engine and server in background
         CoroutineScope(Dispatchers.IO).launch {
-            torrentEngine.start()
-            streamServer.start()
+            try {
+                torrentEngine.start()
+                streamServer.start()
 
-            // Resume all books marked for offline download in library
-            val libraryBooks = database.bookDao().observeAllBooks()
-            libraryBooks.collect { books ->
-                for (book in books) {
-                    if (book.isDownloadRequested && torrentEngine.getHandle(book.infoHash) == null) {
-                        val magnet = com.bookzor.core.scraper.MagnetBuilder.build(book.infoHash, book.title)
-                        torrentEngine.downloadEntireBook(book.infoHash, magnet)
-                        android.util.Log.i("BookzorTorrent", "Resumed offline download for ${book.title}")
+                // Resume all books marked for offline download in library
+                val libraryBooks = database.bookDao().observeAllBooks()
+                libraryBooks.collect { books ->
+                    for (book in books) {
+                        if (book.isDownloadRequested && torrentEngine.getHandle(book.infoHash) == null) {
+                            try {
+                                val magnet = com.bookzor.core.scraper.MagnetBuilder.build(book.infoHash, book.title)
+                                torrentEngine.downloadEntireBook(book.infoHash, magnet)
+                                android.util.Log.i("BookzorTorrent", "Resumed offline download for ${book.title}")
+                            } catch (e: Exception) {
+                                android.util.Log.w("BookzorTorrent", "Failed to resume download for ${book.title}: ${e.message}")
+                            }
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("Bookzor", "Background startup error: ${e.message}", e)
             }
         }
 

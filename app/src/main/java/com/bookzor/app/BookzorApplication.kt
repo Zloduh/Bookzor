@@ -19,6 +19,21 @@ class BookzorApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Set up global crash logger
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                android.util.Log.e("BookzorCrash", "FATAL UNCAUGHT EXCEPTION on thread ${thread.name}", throwable)
+                val crashFile = java.io.File(filesDir, "latest_crash.txt")
+                val sw = java.io.StringWriter()
+                val pw = java.io.PrintWriter(sw)
+                throwable.printStackTrace(pw)
+                crashFile.writeText("Thread: ${thread.name}\nTime: ${java.util.Date()}\n\n$sw")
+            } catch (_: Exception) {}
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         database = BookzorDatabase.getInstance(this)
         torrentEngine = TorrentEngine(this)
         streamServer = TorrentStreamServer(torrentEngine, initialPort = 8080)

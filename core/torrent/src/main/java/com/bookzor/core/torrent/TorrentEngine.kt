@@ -52,8 +52,14 @@ class TorrentEngine(
         scope.launch {
             while (isActive) {
                 delay(5000)
-                val nodes = sessionManager.dhtNodes()
-                android.util.Log.i("BookzorTorrent", "DHT nodes: $nodes | Active torrents: ${activeHandles.size}")
+                try {
+                    if (isRunning.get()) {
+                        val nodes = sessionManager.dhtNodes()
+                        android.util.Log.i("BookzorTorrent", "DHT nodes: $nodes | Active torrents: ${activeHandles.size}")
+                    }
+                } catch (e: Throwable) {
+                    android.util.Log.w("BookzorTorrent", "DHT nodes polling error: ${e.message}")
+                }
             }
         }
     }
