@@ -38,7 +38,11 @@ sealed class UpdateStatus {
 
 class AppUpdateManager(
     private val context: Context,
-    val currentVersion: String = "1.0.0"
+    val currentVersion: String = try {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+    } catch (e: Exception) {
+        "1.0.0"
+    }
 ) {
     companion object {
         private const val GITHUB_LATEST_RELEASE_URL =
