@@ -14,7 +14,7 @@
 - **Minimum SDK:** Android 8.0 (API Level 26).
 - **Primary Test Device:** Samsung Galaxy Tab A7 (`SM-T505`), Android 12, `arm64-v8a`.
 - **Form Factors:** Android Phones and Tablets (adaptive Compose layouts).
-- **Current App Version:** `1.0.2` (`versionCode = 3`).
+- **Current App Version:** `1.0.3` (`versionCode = 4`).
 
 ---
 

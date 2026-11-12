@@ -1,8 +1,14 @@
-# Bookzor 🎧 (v1.0.2)
+# Bookzor 🎧 (v1.0.3)
 
 An advanced Android audiobook streaming player designed to stream audiobooks directly from **AudioBookBay (ABB)** magnet links and local storage, pairing an embedded sequential BitTorrent engine with the ergonomics of *MP3 Audiobook Player Pro* (Oleg Brailean).
 
 ---
+
+## 🛠️ What's New in v1.0.3
+
+- **🔖 Bookmark & Resume Fix:** After closing and reopening the app, the scrubber no longer jumps to the end. Chapter/book durations are now persisted and restored, and playback position is saved periodically and on app close.
+- **🎯 Accurate Bookmark Jumps:** Bookmarks open the correct chapter at the exact saved time (no smart-rewind offset), from the Player, Library and Bookmarks screens.
+- **✨ Bookmark Polish:** One-tap "Bookmark at X" and quick-add button on the player deck, bookmark count, timeline tick markers, tap-to-seek on the scrubber, and editable bookmark notes with chapter labels.
 
 ## 🚀 What's New in v1.0.2 & v1.0.1
 
