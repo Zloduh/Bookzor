@@ -11,7 +11,8 @@ class DomainManager(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
-        .build()
+        .build(),
+    private val preferencesRepository: com.bookzor.core.common.UserPreferencesRepository? = null
 ) {
     companion object {
         val DEFAULT_DOMAINS = listOf(
@@ -24,13 +25,16 @@ class DomainManager(
         )
     }
 
-    private val currentDomain = AtomicReference(DEFAULT_DOMAINS.first())
+    private val currentDomain = AtomicReference(
+        preferencesRepository?.domainMirror?.value ?: DEFAULT_DOMAINS.first()
+    )
 
     fun getActiveDomain(): String = currentDomain.get()
 
     fun setDomain(domain: String) {
         val clean = domain.trimEnd('/')
         currentDomain.set(clean)
+        preferencesRepository?.setDomainMirror(clean)
     }
 
     suspend fun findHealthyDomain(): String = withContext(Dispatchers.IO) {
@@ -44,6 +48,7 @@ class DomainManager(
                 val response = client.newCall(request).execute()
                 if (response.isSuccessful || response.code in 200..399) {
                     currentDomain.set(candidate)
+                    preferencesRepository?.setDomainMirror(candidate)
                     return@withContext candidate
                 }
             } catch (_: Exception) {

@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 enum class DrawerDestination(val title: String, val icon: ImageVector) {
     PLAYER("Player", Icons.Default.PlayArrow),
     BOOKS("Books", Icons.AutoMirrored.Filled.MenuBook),
-    TO_READ("To-Read List", Icons.Default.BookmarkAdded),
+    TO_READ("Listen Later", Icons.Default.BookmarkAdded),
     DISCOVER("Discover (ABB)", Icons.Default.Search),
     SLEEP_TIMER("Sleep timer", Icons.Default.Timer),
     BOOKMARKS("Bookmarks", Icons.Default.BookmarkBorder),
@@ -81,12 +81,12 @@ fun AppDrawerContent(
         DrawerDestination.entries.forEach { destination ->
             val isSelected = when (destination) {
                 DrawerDestination.PLAYER -> currentRoute.startsWith("player")
-                DrawerDestination.BOOKS -> currentRoute == "library"
-                DrawerDestination.TO_READ -> currentRoute == "to_read"
-                DrawerDestination.DISCOVER -> currentRoute == "catalog"
-                DrawerDestination.SLEEP_TIMER -> currentRoute == "sleep_timer"
-                DrawerDestination.BOOKMARKS -> currentRoute == "all_bookmarks"
-                DrawerDestination.SETTINGS -> currentRoute == "settings"
+                DrawerDestination.BOOKS -> currentRoute.startsWith("library")
+                DrawerDestination.TO_READ -> currentRoute.startsWith("to_read")
+                DrawerDestination.DISCOVER -> currentRoute.startsWith("catalog")
+                DrawerDestination.SLEEP_TIMER -> currentRoute.startsWith("sleep_timer")
+                DrawerDestination.BOOKMARKS -> currentRoute.startsWith("all_bookmarks")
+                DrawerDestination.SETTINGS -> currentRoute.startsWith("settings")
             }
 
             Row(

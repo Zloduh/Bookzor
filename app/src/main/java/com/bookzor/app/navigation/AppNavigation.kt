@@ -35,6 +35,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
+import com.bookzor.core.common.UserPreferencesRepository
 import com.bookzor.core.database.BookzorDatabase
 import com.bookzor.core.database.entity.BookEntity
 import com.bookzor.core.player.AudioPlayerController
@@ -53,6 +54,31 @@ import com.bookzor.feature.player.ui.SleepTimerScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private fun parseBtih(input: String): String? {
+    val hexMatch = Regex("btih:([a-fA-F0-9]{40})", RegexOption.IGNORE_CASE).find(input)
+    if (hexMatch != null) return hexMatch.groupValues[1].lowercase()
+    val base32Match = Regex("btih:([a-zA-Z2-7]{32})", RegexOption.IGNORE_CASE).find(input)
+    if (base32Match != null) {
+        val b32 = base32Match.groupValues[1].uppercase()
+        val base32Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        var bits = 0
+        var bitCount = 0
+        val bytes = mutableListOf<Byte>()
+        for (char in b32) {
+            val valIndex = base32Chars.indexOf(char)
+            if (valIndex == -1) continue
+            bits = (bits shl 5) or valIndex
+            bitCount += 5
+            if (bitCount >= 8) {
+                bitCount -= 8
+                bytes.add(((bits shr bitCount) and 0xFF).toByte())
+            }
+        }
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+    return null
+}
 
 sealed class Screen(val route: String) {
     data object Player : Screen("player")
@@ -450,12 +476,40 @@ fun AppNavigation(
                         },
                         onSubmitDirectMagnet = { input ->
                             if (input.startsWith("magnet:?xt=")) {
-                                val hash = Regex("btih:([a-fA-F0-9]{40})").find(input)?.groupValues?.get(1)?.lowercase()
+                                val hash = parseBtih(input)
                                 if (hash != null) {
-                                    torrentEngine.downloadMagnet(input)
-                                    val streamUrl = streamServer.getStreamUrl(hash, 0)
-                                    playerController.playStream(streamUrl, hash, 0)
-                                    navController.navigate(Screen.Player.route)
+                                    scope.launch(Dispatchers.IO) {
+                                        if (database.bookDao().getBook(hash) == null) {
+                                            val dnMatch = Regex("[?&]dn=([^&]+)").find(input)?.groupValues?.get(1)
+                                            val title = dnMatch?.let {
+                                                try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                                            } ?: "Direct Magnet (${hash.take(8)})"
+                                            database.bookDao().insertOrUpdate(
+                                                BookEntity(
+                                                    infoHash = hash,
+                                                    title = title,
+                                                    author = "Unknown Author",
+                                                    narrator = null,
+                                                    coverUrl = null,
+                                                    description = null,
+                                                    format = "Audiobook",
+                                                    isAbridged = false,
+                                                    totalSizeBytes = 0L,
+                                                    totalDurationMs = 0L,
+                                                    sourceUrl = input,
+                                                    isInLibrary = true,
+                                                    isDownloadRequested = true,
+                                                    lastAccessedAt = System.currentTimeMillis()
+                                                )
+                                            )
+                                        }
+                                        withContext(Dispatchers.Main) {
+                                            torrentEngine.downloadMagnet(input)
+                                            val streamUrl = streamServer.getStreamUrl(hash, 0)
+                                            playerController.playStream(streamUrl, hash, 0)
+                                            navController.navigate(Screen.Player.route)
+                                        }
+                                    }
                                 }
                             } else if (input.startsWith("http")) {
                                 navController.navigate(Screen.Detail.createRoute(input))
@@ -509,14 +563,34 @@ fun AppNavigation(
 
                 // --- 4. SLEEP TIMER SCREEN ---
                 composable(Screen.SleepTimer.route) {
+                    val remainingSec by playerController.sleepTimer.remainingSeconds.collectAsState()
+                    val isEndOfChapter by playerController.sleepTimer.isEndOfChapter.collectAsState()
+
                     SleepTimerScreen(
-                        activeRemainingSec = null,
+                        activeRemainingSec = remainingSec,
+                        isEndOfChapter = isEndOfChapter,
                         onSetTimerMinutes = { mins ->
+                            playerController.sleepTimer.startTimer(mins)
+                        },
+                        onSetEndOfChapter = {
                             scope.launch {
-                                // set timer
+                                val infoHash = activeInfoHash ?: ""
+                                val tracks = withContext(Dispatchers.IO) {
+                                    if (infoHash.isNotEmpty()) database.audioTrackDao().getTracks(infoHash) else emptyList()
+                                }
+                                val activeTrackDuration = tracks.getOrNull(playerState.currentTrackIndex)?.durationMs ?: 0L
+                                val effectiveDur = when {
+                                    playerState.durationMs > 0L -> playerState.durationMs
+                                    activeTrackDuration > 0L -> activeTrackDuration
+                                    tracks.size <= 1 && (activeBook?.totalDurationMs ?: 0L) > 0L -> activeBook?.totalDurationMs ?: 0L
+                                    else -> 0L
+                                }
+                                playerController.sleepTimer.startEndOfChapterTimer(effectiveDur, playerState.currentPositionMs)
                             }
                         },
-                        onCancelTimer = {},
+                        onCancelTimer = {
+                            playerController.sleepTimer.cancelTimer()
+                        },
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -767,6 +841,11 @@ fun AppNavigation(
 
             // Docked MiniPlayer when on other screens
             if (!isPlayerScreen && activeBook != null) {
+                val navContext = androidx.compose.ui.platform.LocalContext.current
+                val navPrefsRepo = remember { com.bookzor.core.common.UserPreferencesRepository.getInstance(navContext) }
+                val navJumpBackSec by navPrefsRepo.jumpBackSec.collectAsState()
+                val navJumpForwardSec by navPrefsRepo.jumpForwardSec.collectAsState()
+
                 val miniDurationMs = if (playerState.durationMs > 0L) {
                     playerState.durationMs
                 } else {
@@ -779,6 +858,8 @@ fun AppNavigation(
                     isPlaying = playerState.isPlaying,
                     positionMs = playerState.currentPositionMs,
                     durationMs = miniDurationMs,
+                    jumpBackSec = navJumpBackSec,
+                    jumpForwardSec = navJumpForwardSec,
                     onTogglePlayPause = {
                         val infoHash = activeInfoHash ?: ""
                         if (!playerController.hasMediaItem && infoHash.isNotEmpty()) {
@@ -797,8 +878,8 @@ fun AppNavigation(
                             playerController.togglePlayPause()
                         }
                     },
-                    onJumpBack = { playerController.jumpBack(15) },
-                    onJumpForward = { playerController.jumpForward(15) },
+                    onJumpBack = { playerController.jumpBack(navJumpBackSec) },
+                    onJumpForward = { playerController.jumpForward(navJumpForwardSec) },
                     onExpand = {
                         navController.navigate(Screen.Player.route)
                     },

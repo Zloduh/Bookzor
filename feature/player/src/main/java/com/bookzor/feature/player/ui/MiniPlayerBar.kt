@@ -46,6 +46,8 @@ fun MiniPlayerBar(
     onJumpBack: () -> Unit,
     onJumpForward: () -> Unit,
     onExpand: () -> Unit,
+    jumpBackSec: Int = 15,
+    jumpForwardSec: Int = 15,
     modifier: Modifier = Modifier
 ) {
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -108,7 +110,7 @@ fun MiniPlayerBar(
             }
 
             // Quick Controls
-            // Jump Back -15s
+            // Jump Back
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -118,7 +120,7 @@ fun MiniPlayerBar(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "↺15",
+                    text = "↺$jumpBackSec",
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -146,7 +148,7 @@ fun MiniPlayerBar(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Jump Forward +30s
+            // Jump Forward
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -156,7 +158,7 @@ fun MiniPlayerBar(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "30↻",
+                    text = "${jumpForwardSec}↻",
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold

@@ -36,11 +36,13 @@ class PlaybackService : MediaSessionService() {
         playerController = controller
         val player = controller?.exoPlayer ?: run {
             val db = BookzorDatabase.getInstance(applicationContext)
+            val prefs = com.bookzor.core.common.UserPreferencesRepository.getInstance(applicationContext)
             AudioPlayerController(
                 applicationContext,
                 db.playbackStateDao(),
                 db.bookDao(),
-                db.audioTrackDao()
+                db.audioTrackDao(),
+                prefs
             ).exoPlayer
         }
 

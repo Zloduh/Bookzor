@@ -69,7 +69,18 @@ fun BookDetailRoute(
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var isToRead by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val db = remember { com.bookzor.core.database.BookzorDatabase.getInstance(context) }
+
+    val infoHash = state.bookDetail?.infoHash
+    val existingBook by androidx.compose.runtime.produceState<com.bookzor.core.database.entity.BookEntity?>(initialValue = null, infoHash) {
+        if (infoHash != null) {
+            db.bookDao().observeBook(infoHash).collect { value = it }
+        } else {
+            value = null
+        }
+    }
+    val isToRead = existingBook?.isToRead ?: false
 
     LaunchedEffect(detailUrl) {
         viewModel.loadBook(detailUrl)
@@ -148,11 +159,11 @@ fun BookDetailRoute(
                             }
                         },
                         onToggleToRead = {
-                            isToRead = !isToRead
-                            onToggleToRead(detail.infoHash, isToRead)
+                            val nextToRead = !isToRead
+                            onToggleToRead(detail.infoHash, nextToRead)
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    if (isToRead) "Added to Listen Later 🔖" else "Removed from Listen Later"
+                                    if (nextToRead) "Added to Listen Later 🔖" else "Removed from Listen Later"
                                 )
                             }
                         },

@@ -131,8 +131,12 @@ class TorrentStreamServer(
                     if (kv.size == 2) kv[0] to kv[1] else "" to ""
                 }
 
-                val infoHash = queryParams["hash"]?.lowercase() ?: run {
+                val infoHash = queryParams["hash"]?.lowercase()?.trim() ?: run {
                     sendBadRequest(output, "Missing hash parameter")
+                    return@withContext
+                }
+                if (!infoHash.matches(Regex("^[a-f0-9]{40}$"))) {
+                    sendBadRequest(output, "Invalid hash parameter format")
                     return@withContext
                 }
                 val fileIndex = queryParams["fileIndex"]?.toIntOrNull() ?: 0
@@ -174,21 +178,35 @@ class TorrentStreamServer(
                 val filePath = torrentFile.files().filePath(fileIndex)
                 val targetFile = File(torrentEngine.storageDir, filePath)
 
+                // Prevent Path Traversal (Zip Slip / Torrent Slip)
+                val targetCanonical = try { targetFile.canonicalPath } catch (_: Exception) { "" }
+                val storageCanonical = try { torrentEngine.storageDir.canonicalPath } catch (_: Exception) { "" }
+                if (targetCanonical.isEmpty() || storageCanonical.isEmpty() || !targetCanonical.startsWith(storageCanonical)) {
+                    sendForbidden(output, "Access denied: file outside storage boundary")
+                    return@withContext
+                }
+
                 // Notify scheduler of container headers for M4B
                 val scheduler = torrentEngine.getScheduler(infoHash)
                 if (filePath.endsWith(".m4b", ignoreCase = true)) {
                     scheduler?.prioritizeContainerHeaders()
                 }
 
-                // Parse byte range
+                // Parse byte range (supporting standard and suffix byte ranges)
                 var startByte = 0L
                 var endByte = totalFileSize - 1
 
                 if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
                     val rangeSpec = rangeHeader.removePrefix("bytes=").trim()
                     val rangeParts = rangeSpec.split("-")
-                    startByte = rangeParts[0].toLongOrNull() ?: 0L
-                    endByte = rangeParts.getOrNull(1)?.toLongOrNull() ?: (totalFileSize - 1)
+                    if (rangeSpec.startsWith("-")) {
+                        val suffixLen = rangeParts.getOrNull(1)?.toLongOrNull() ?: 0L
+                        startByte = maxOf(0L, totalFileSize - suffixLen)
+                        endByte = totalFileSize - 1
+                    } else {
+                        startByte = rangeParts[0].toLongOrNull() ?: 0L
+                        endByte = rangeParts.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull() ?: (totalFileSize - 1)
+                    }
                 }
 
                 if (startByte > endByte || startByte >= totalFileSize) {
@@ -280,6 +298,11 @@ class TorrentStreamServer(
         output.flush()
     }
 
+    private fun sendForbidden(output: BufferedOutputStream, message: String = "Forbidden") {
+        output.write("HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n$message".toByteArray())
+        output.flush()
+    }
+
     private fun sendBadRequest(output: BufferedOutputStream, message: String = "Bad Request") {
         output.write("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n$message".toByteArray())
         output.flush()
@@ -303,8 +326,14 @@ class TorrentStreamServer(
         if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
             val rangeSpec = rangeHeader.removePrefix("bytes=").trim()
             val rangeParts = rangeSpec.split("-")
-            startByte = rangeParts[0].toLongOrNull() ?: 0L
-            endByte = rangeParts.getOrNull(1)?.toLongOrNull() ?: (totalFileSize - 1)
+            if (rangeSpec.startsWith("-")) {
+                val suffixLen = rangeParts.getOrNull(1)?.toLongOrNull() ?: 0L
+                startByte = maxOf(0L, totalFileSize - suffixLen)
+                endByte = totalFileSize - 1
+            } else {
+                startByte = rangeParts[0].toLongOrNull() ?: 0L
+                endByte = rangeParts.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull() ?: (totalFileSize - 1)
+            }
         }
 
         if (startByte > endByte || startByte >= totalFileSize) {

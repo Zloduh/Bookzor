@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bookzor.core.common.AppTheme
 import com.bookzor.core.common.ThemeManager
+import com.bookzor.core.common.UserPreferencesRepository
 import com.bookzor.core.scraper.DomainManager
 import kotlinx.coroutines.launch
 import java.io.File
@@ -73,14 +74,33 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val currentTheme by ThemeManager.currentTheme.collectAsState()
+    val preferencesRepo = remember { UserPreferencesRepository.getInstance(context) }
+
+    val jumpBackSec by preferencesRepo.jumpBackSec.collectAsState()
+    val jumpForwardSec by preferencesRepo.jumpForwardSec.collectAsState()
+    val smartRewind by preferencesRepo.smartRewind.collectAsState()
+    val wifiOnly by preferencesRepo.wifiOnly.collectAsState()
+
+    val packageVersionName = remember {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                ).versionName ?: "1.0.3"
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.3"
+            }
+        } catch (_: Exception) {
+            "1.0.3"
+        }
+    }
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showDomainDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showJumpDialog by remember { mutableStateOf(false) }
-
-    var wifiOnly by remember { mutableStateOf(false) }
-    var smartRewind by remember { mutableStateOf(true) }
 
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
@@ -153,7 +173,7 @@ fun SettingsScreen(
                 SettingsClickableRow(
                     icon = Icons.Default.Tune,
                     title = "Jump Intervals",
-                    subtitle = "Customize -15s and +15s buttons",
+                    subtitle = "Customize -${jumpBackSec}s and +${jumpForwardSec}s buttons",
                     onClick = { showJumpDialog = true }
                 )
                 Divider(color = Color(0xFF282828))
@@ -162,7 +182,7 @@ fun SettingsScreen(
                     title = "Smart Rewind",
                     subtitle = "Auto-rewind 10-30s after long pause",
                     checked = smartRewind,
-                    onCheckedChange = { smartRewind = it }
+                    onCheckedChange = { preferencesRepo.setSmartRewind(it) }
                 )
             }
 
@@ -183,7 +203,7 @@ fun SettingsScreen(
                     title = "Download only on Wi-Fi",
                     subtitle = "Prevent cellular data usage for torrents",
                     checked = wifiOnly,
-                    onCheckedChange = { wifiOnly = it }
+                    onCheckedChange = { preferencesRepo.setWifiOnly(it) }
                 )
             }
 
@@ -253,7 +273,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(text = "Bookzor Professional", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text(text = "Version 1.0.0 • Native Android Torrent Streamer", color = Color.Gray, fontSize = 12.sp)
+                        Text(text = "Version $packageVersionName • Native Android Torrent Streamer", color = Color.Gray, fontSize = 12.sp)
                     }
                 }
             }
@@ -278,10 +298,10 @@ fun SettingsScreen(
     // Jump Intervals Dialog
     if (showJumpDialog) {
         JumpIntervalsDialog(
-            currentBackSec = 15,
-            currentForwardSec = 15,
-            onBackSecChange = {},
-            onForwardSecChange = {},
+            currentBackSec = jumpBackSec,
+            currentForwardSec = jumpForwardSec,
+            onBackSecChange = { preferencesRepo.setJumpBackSec(it) },
+            onForwardSecChange = { preferencesRepo.setJumpForwardSec(it) },
             onDismiss = { showJumpDialog = false }
         )
     }
@@ -296,7 +316,7 @@ fun SettingsScreen(
             },
             text = {
                 Text(
-                    text = "This will delete all $usedSpaceMb MB of downloaded audio files from your tablet. Your reading progress and bookmarks will be kept.",
+                    text = "This will clear $usedSpaceMb MB of downloaded torrent cache pieces from your tablet. Your sideloaded books, reading progress, and bookmarks will not be affected.",
                     color = Color.LightGray,
                     fontSize = 14.sp
                 )

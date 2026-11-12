@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bookzor.core.common.Resource
 import com.bookzor.core.scraper.AbbScraperService
 import com.bookzor.core.scraper.model.BookSearchResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +29,10 @@ class CatalogViewModel(
     private val _uiState = MutableStateFlow(CatalogUiState())
     val uiState: StateFlow<CatalogUiState> = _uiState.asStateFlow()
 
+    private var searchJob: Job? = null
+
     init {
-        search("dune")
+        search("audiobook")
     }
 
     fun onQueryChange(newQuery: String) {
@@ -38,14 +41,16 @@ class CatalogViewModel(
 
     fun search(query: String = _uiState.value.query) {
         val cleanQuery = query.trim().ifEmpty { "audiobook" }
+        searchJob?.cancel()
         _uiState.value = _uiState.value.copy(
+            query = query,
             isLoading = true,
             currentPage = 1,
             canLoadMore = true,
             errorMessage = null
         )
 
-        viewModelScope.launch {
+        searchJob = viewModelScope.launch {
             when (val result = scraperService.search(cleanQuery, page = 1)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(

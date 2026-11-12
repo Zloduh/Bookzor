@@ -16,6 +16,8 @@ class BookzorApplication : Application() {
         private set
     lateinit var playerController: AudioPlayerController
         private set
+    lateinit var preferencesRepository: com.bookzor.core.common.UserPreferencesRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -35,6 +37,7 @@ class BookzorApplication : Application() {
         }
 
         database = BookzorDatabase.getInstance(this)
+        preferencesRepository = com.bookzor.core.common.UserPreferencesRepository.getInstance(this)
         torrentEngine = TorrentEngine(this).apply {
             fileResolver = { hash, idx ->
                 val tracks = database.audioTrackDao().getTracks(hash)
@@ -57,7 +60,8 @@ class BookzorApplication : Application() {
             context = this,
             playbackStateDao = database.playbackStateDao(),
             bookDao = database.bookDao(),
-            audioTrackDao = database.audioTrackDao()
+            audioTrackDao = database.audioTrackDao(),
+            preferencesRepository = preferencesRepository
         )
     }
 }

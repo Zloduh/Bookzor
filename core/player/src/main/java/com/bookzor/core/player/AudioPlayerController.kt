@@ -38,6 +38,7 @@ class AudioPlayerController(
     private val playbackStateDao: PlaybackStateDao? = null,
     private val bookDao: com.bookzor.core.database.dao.BookDao? = null,
     private val audioTrackDao: com.bookzor.core.database.dao.AudioTrackDao? = null,
+    private val preferencesRepository: com.bookzor.core.common.UserPreferencesRepository? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ) {
     companion object {
@@ -67,8 +68,15 @@ class AudioPlayerController(
                 /* handleAudioFocus = */ true
             )
             .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
     }
+
+    val sleepTimer = SleepTimerController(
+        exoPlayer = exoPlayer,
+        onTimerExpired = { togglePlayPause() },
+        scope = scope
+    )
 
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
@@ -243,7 +251,8 @@ class AudioPlayerController(
 
         // Calculate Smart Rewind only when resuming after pause (never when jumping to a bookmark or chapter)
         var finalStartPos = maxOf(0L, startPositionMs)
-        if (applySmartRewind && lastPauseTimestamp > 0 && startPositionMs > 0) {
+        val isSmartRewindAllowed = applySmartRewind && (preferencesRepository?.smartRewind?.value ?: true)
+        if (isSmartRewindAllowed && lastPauseTimestamp > 0 && startPositionMs > 0) {
             val pausedDurationMs = System.currentTimeMillis() - lastPauseTimestamp
             val rewindMs = when {
                 pausedDurationMs > 24 * 60 * 60 * 1000 -> 60_000L // >24h -> 60s
@@ -480,6 +489,7 @@ class AudioPlayerController(
     }
 
     fun release() {
+        sleepTimer.cancelTimer()
         progressTrackingJob?.cancel()
         saveCurrentState()
         loudnessEnhancer?.release()

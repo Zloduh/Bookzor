@@ -201,15 +201,18 @@ class TorrentEngine(
         if (handle != null && handle.isValid) {
             try {
                 val torrentFile = handle.torrentFile()
-                val filePath = if (torrentFile != null && torrentFile.isValid) torrentFile.files().filePath(0) else null
                 sessionManager.remove(handle, org.libtorrent4j.swig.session_handle.delete_files)
 
-                if (filePath != null) {
-                    val file = File(storageDir, filePath)
-                    if (file.exists()) file.delete()
-                    file.parentFile?.let { parent ->
-                        if (parent != storageDir && parent.exists() && parent.listFiles()?.isEmpty() == true) {
-                            parent.delete()
+                if (torrentFile != null && torrentFile.isValid) {
+                    val numFiles = torrentFile.numFiles()
+                    for (i in 0 until numFiles) {
+                        val filePath = torrentFile.files().filePath(i)
+                        val file = File(storageDir, filePath)
+                        if (file.exists()) file.delete()
+                        file.parentFile?.let { parent ->
+                            if (parent != storageDir && parent.exists() && parent.listFiles()?.isEmpty() == true) {
+                                parent.delete()
+                            }
                         }
                     }
                 }
@@ -253,19 +256,19 @@ class TorrentEngine(
         activeHandles.clear()
         schedulers.clear()
 
-        // Delete all files and subdirectories from storage directory
+        // Safely wipe piece cache and temporary download fragments, preserving user-placed audio files
         try {
+            context.cacheDir.deleteRecursively()
             storageDir.listFiles()?.forEach { file ->
-                file.deleteRecursively()
-            }
-            // Double check bottom-up cleanup
-            storageDir.walkBottomUp().forEach { file ->
-                if (file != storageDir) {
-                    try { file.delete() } catch (_: Exception) {}
+                if (file.name.endsWith(".parts", ignoreCase = true) ||
+                    file.name.endsWith(".torrent", ignoreCase = true) ||
+                    file.name.startsWith(".temp_")
+                ) {
+                    file.deleteRecursively()
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.w("BookzorTorrent", "Error deleting storage files: ${e.message}")
+            android.util.Log.w("BookzorTorrent", "Error deleting cache files: ${e.message}")
         }
 
         android.util.Log.i("BookzorTorrent", "All torrent cache wiped successfully from disk.")

@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
         playerController = app.playerController
 
         checkStoragePermission()
+        checkNotificationPermission()
 
         // Start torrent engine, server, and local audiobook scanner in background
         CoroutineScope(Dispatchers.IO).launch {
@@ -138,6 +139,14 @@ class MainActivity : ComponentActivity() {
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
             requestPermissions(permissions, 1001)
+        }
+    }
+
+    private fun checkNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
+            }
         }
     }
 

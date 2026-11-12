@@ -57,6 +57,7 @@ class DetailViewModel @JvmOverloads constructor(
 
     private suspend fun saveBookToDb(detail: BookDetail, sourceUrl: String) {
         val totalBytes = detail.tracks.sumOf { it.sizeBytes }
+        val existingBook = db.bookDao().getBook(detail.infoHash)
         val bookEntity = BookEntity(
             infoHash = detail.infoHash,
             title = detail.title,
@@ -67,8 +68,11 @@ class DetailViewModel @JvmOverloads constructor(
             format = detail.format,
             isAbridged = detail.isAbridged,
             totalSizeBytes = totalBytes,
-            totalDurationMs = 0L,
+            totalDurationMs = existingBook?.totalDurationMs ?: 0L,
             sourceUrl = sourceUrl,
+            isInLibrary = existingBook?.isInLibrary ?: false,
+            isDownloadRequested = existingBook?.isDownloadRequested ?: false,
+            isToRead = existingBook?.isToRead ?: false,
             lastAccessedAt = System.currentTimeMillis()
         )
         db.bookDao().insertOrUpdate(bookEntity)

@@ -1,5 +1,6 @@
 package com.bookzor.feature.player.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +29,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -146,5 +150,33 @@ fun ChapterDrawerBottomSheet(
                 }
             )
         }
+    }
+}
+
+@Composable
+fun PieProgressIcon(percent: Int, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 1.5.dp.toPx()
+        val radius = (size.minDimension - strokeWidth) / 2
+        val center = Offset(size.width / 2, size.height / 2)
+
+        // Outer ring
+        drawCircle(
+            color = Color(0xFFFF5722),
+            radius = radius,
+            center = center,
+            style = Stroke(width = strokeWidth)
+        )
+
+        // Inner filled arc representing completion
+        val sweepAngle = (percent / 100f) * 360f
+        drawArc(
+            color = Color(0xFFFF5722),
+            startAngle = -90f,
+            sweepAngle = sweepAngle,
+            useCenter = true,
+            topLeft = Offset(center.x - radius + strokeWidth, center.y - radius + strokeWidth),
+            size = Size((radius - strokeWidth) * 2, (radius - strokeWidth) * 2)
+        )
     }
 }

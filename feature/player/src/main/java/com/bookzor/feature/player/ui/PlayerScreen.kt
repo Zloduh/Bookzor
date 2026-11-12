@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,12 +48,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.bookzor.core.common.UserPreferencesRepository
 import com.bookzor.core.database.entity.AudioTrackEntity
 import com.bookzor.core.database.entity.BookEntity
 import com.bookzor.core.database.entity.BookmarkEntity
@@ -102,8 +105,10 @@ fun PlayerScreen(
     var showBookmarksSheet by remember { mutableStateOf(false) }
     var showJumpDialog by remember { mutableStateOf(false) }
 
-    var jumpBackSec by remember { mutableIntStateOf(15) }
-    var jumpForwardSec by remember { mutableIntStateOf(15) }
+    val context = LocalContext.current
+    val preferencesRepo = remember { UserPreferencesRepository.getInstance(context) }
+    val jumpBackSec by preferencesRepo.jumpBackSec.collectAsState()
+    val jumpForwardSec by preferencesRepo.jumpForwardSec.collectAsState()
 
     val hasActiveBook = book != null && book.infoHash.isNotEmpty()
     val tracksTotalDuration = tracks.sumOf { maxOf(0L, it.durationMs) }
@@ -429,8 +434,8 @@ fun PlayerScreen(
         JumpIntervalsDialog(
             currentBackSec = jumpBackSec,
             currentForwardSec = jumpForwardSec,
-            onBackSecChange = { jumpBackSec = it },
-            onForwardSecChange = { jumpForwardSec = it },
+            onBackSecChange = { preferencesRepo.setJumpBackSec(it) },
+            onForwardSecChange = { preferencesRepo.setJumpForwardSec(it) },
             onDismiss = { showJumpDialog = false }
         )
     }

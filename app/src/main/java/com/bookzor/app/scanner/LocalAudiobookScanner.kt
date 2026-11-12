@@ -162,9 +162,9 @@ class LocalAudiobookScanner(
             totalSizeBytes = totalSize,
             totalDurationMs = totalDuration,
             sourceUrl = dir.absolutePath,
-            isInLibrary = true,
-            isDownloadRequested = false,
-            isToRead = false,
+            isInLibrary = existing?.isInLibrary ?: true,
+            isDownloadRequested = existing?.isDownloadRequested ?: false,
+            isToRead = existing?.isToRead ?: false,
             lastAccessedAt = existing?.lastAccessedAt ?: System.currentTimeMillis()
         )
         database.bookDao().insertOrUpdate(book)
@@ -259,9 +259,9 @@ class LocalAudiobookScanner(
             totalSizeBytes = file.length(),
             totalDurationMs = duration,
             sourceUrl = file.absolutePath,
-            isInLibrary = true,
-            isDownloadRequested = false,
-            isToRead = false,
+            isInLibrary = existing?.isInLibrary ?: true,
+            isDownloadRequested = existing?.isDownloadRequested ?: false,
+            isToRead = existing?.isToRead ?: false,
             lastAccessedAt = existing?.lastAccessedAt ?: System.currentTimeMillis()
         )
         database.bookDao().insertOrUpdate(book)
