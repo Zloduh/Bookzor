@@ -19,7 +19,7 @@ Bookzor/
     ├── catalog/                   # ABB search & discovery screens, direct magnet dialog
     ├── detail/                    # Book inspection, selective file download list, torrent metadata
     ├── library/                   # Books library, To-Read shelf, Global Bookmarks manager, search filter
-    └── player/                    # Oleg Brailean-inspired playback deck, sheets, settings
+    └── player/                    # Adaptive playback deck, sheets, settings
 ```
 
 ---
@@ -159,7 +159,7 @@ For zero-friction bug reporting:
 To allow rapid discovery of related audiobooks directly from the playback or library interface:
 
 1. **Player Screen & Top Strip:**
-   - In `OlegBookStrip`, Author and Narrator text are interactive: tapping either invokes `onSearchQuery(name)`.
+   - In `BookDetailStrip`, Author and Narrator text are interactive: tapping either invokes `onSearchQuery(name)`.
    - A dedicated **Discovery Chips Bar** appears right below the top strip with `👤 More by [Author]`, `🎙️ Voice: [Narrator]`, and `ℹ️ Details`.
 2. **Library Cards & Details Modal:**
    - Every `LibraryBookCard` includes clickable author/narrator links and discovery chips.

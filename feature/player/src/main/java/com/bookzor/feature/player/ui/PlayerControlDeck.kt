@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OlegPlayerDeck(
+fun BookzorPlayerDeck(
     chapterTitle: String,
     positionMs: Long,
     durationMs: Long,
@@ -145,7 +145,7 @@ fun OlegPlayerDeck(
                 )
             }
 
-            // HERO PLAY/PAUSE (Large layered circle matching Oleg Brailean)
+            // Hero Play/Pause
             Box(
                 modifier = Modifier
                     .size(76.dp)

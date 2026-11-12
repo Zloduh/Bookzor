@@ -16,13 +16,12 @@ Both workflows are documented below.
 
 ---
 
-## 📱 Attached Test Device Details
+## 📱 Target Android Device Requirements
 
-The current development host has the following target device connected via USB:
-- **Device Model:** Samsung Galaxy Tab A7 (`SM-T505`)
-- **Android Version:** Android 12 (API Level 31/32)
-- **CPU Architecture:** `arm64-v8a`
-- **Device Serial:** `R9TR605RELJ` (verified via `adb devices`)
+Bookzor supports testing on physical Android devices or emulators with the following specifications:
+- **Android Version:** Android 8.0 (API Level 26) through Android 14 (API Level 34)
+- **CPU Architecture:** `arm64-v8a`, `armeabi-v7a`, or `x86_64`
+- **Storage:** Internal/External storage with USB or Wi-Fi debugging enabled
 
 ---
 
@@ -119,23 +118,23 @@ If you prefer Android Studio:
 
 ---
 
-## 🔌 Step 3: Setting Up the Samsung Tablet (SM-T505)
+## 🔌 Step 3: Setting Up an Android Device (USB / Wi-Fi Debugging)
 
 1. **Verify Developer Options & USB Debugging:**
-   - On the tablet: Settings -> About tablet -> Software information -> Tap **"Build number"** 7 times.
+   - On the device: Settings -> About phone/tablet -> Software information -> Tap **"Build number"** 7 times.
    - Settings -> Developer options -> Enable **USB Debugging**.
-   - If prompted on the tablet screen with *"Allow USB debugging?"*, check *"Always allow from this computer"* and tap **OK**.
+   - If prompted on the device screen with *"Allow USB debugging?"*, check *"Always allow from this computer"* and tap **OK**.
 
 2. **Verify connection from the command line:**
    ```bash
    adb devices
    ```
-   Output must show:
+   Output will show your device connected:
    ```text
    List of devices attached
-   R9TR605RELJ    device
+   <device-serial>    device
    ```
-   *(If it says `unauthorized`, unlock the tablet screen and accept the prompt).*
+   *(If it says `unauthorized`, unlock the device screen and accept the prompt).*
 
 ---
 

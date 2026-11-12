@@ -12,7 +12,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 | **Epic 2** | **ABB Scraper & Domain Engine** | HTML scraping, magnet construction, domain failover | Jsoup, OkHttp 4, Coroutines |
 | **Epic 3** | **BitTorrent Streaming Engine** | libtorrent4j integration, sequential scheduler, HTTP Range server | libtorrent4j, Ktor Embedded Server / NanoHTTPD |
 | **Epic 4** | **Audio Engine & Playback Service** | Foreground playback service, lockscreen controls, pitch speed, loudness boost | Media3 ExoPlayer, MediaSessionService, LoudnessEnhancer |
-| **Epic 5** | **Oleg Brailean-Inspired Player UI** | Dual progress bars, fine scrubbing slider, gestures, sleep timer with shake-to-reset | Jetpack Compose, Material 3, SensorManager |
+| **Epic 5** | **Player UI & Playback Controls** | Dual progress bars, fine scrubbing slider, gestures, sleep timer with shake-to-reset | Jetpack Compose, Material 3, SensorManager |
 | **Epic 6** | **Catalog, Search & Detail Screens** | ABB search UI, category filters, detail screen with torrent inspector | Jetpack Compose, Coil (images), ViewModel |
 | **Epic 7** | **Persistence & Offline Library** | Room DB playback state, chapter resume, offline storage management | Room DB, DataStore Preferences |
 
@@ -43,10 +43,10 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
     - Set `compileSdk = 34`, `minSdk = 26`, `targetSdk = 34`.
     - Configure NDK ABI filters: `ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }`.
     - Add required permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS`, `WAKE_LOCK`.
-    - Configure `hardwareAccelerated = true` and `supports-screens` for tablet compatibility (SM-T505).
+    - Configure `hardwareAccelerated = true` and `supports-screens` for tablet compatibility.
   - **Acceptance Criteria:**
     - [ ] `./gradlew assembleDebug` builds `app-debug.apk`.
-    - [ ] `adb install app-debug.apk` installs cleanly on the attached Samsung tablet (`SM-T505`).
+    - [ ] `adb install app-debug.apk` installs cleanly on an attached Android device or emulator.
 
 ---
 
@@ -208,11 +208,11 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 
 ---
 
-## 🎛️ Epic 5: Oleg Brailean-Inspired Player UI & Controls
+## 🎛️ Epic 5: Advanced Player UI & Controls
 
 ### Story 5.1: High-Ergonomics Player Screen
 **As a** power audiobook listener,  
-**I want** an interface modeled after *MP3 Audiobook Player Pro* with dual progress bars, fine scrubbing, gestures, and a shake-to-reset sleep timer,  
+**I want** an ergonomic interface with dual progress bars, fine scrubbing, gestures, and a shake-to-reset sleep timer,  
 **So that** I have maximum control over my audiobooks.
 
 #### Tasks:
@@ -458,7 +458,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 - [x] **Task 12.1.1: Player Screen Discovery Chips & Interactive Metadata**
   - **Path:** `feature/player/src/main/java/com/bookzor/feature/player/ui/PlayerScreen.kt`
   - **Details:**
-    - Make author and narrator text in `OlegBookStrip` clickable to search AudioBookBay.
+    - Make author and narrator text in `BookDetailStrip` clickable to search AudioBookBay.
     - Add `BookAuthorNarratorChips` bar below the top strip with `👤 More by [Author]`, `🎙️ Voice: [Narrator]`, and `ℹ️ Details`.
 - [x] **Task 12.1.2: Library Screen Discovery & Real-Time Filter**
   - **Path:** `feature/library/src/main/java/com/bookzor/feature/library/ui/LibraryScreen.kt`

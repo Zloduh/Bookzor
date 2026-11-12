@@ -4,7 +4,7 @@
 
 ## 1. Executive Summary
 
-**Bookzor** is a native Android audiobook player designed to stream audiobooks on-demand directly from magnet links discovered via **AudioBookBay (ABB)** as well as offline audiobooks saved to device storage. It pairs sequential BitTorrent streaming technology with the ergonomic audiobook playback controls modeled after *MP3 Audiobook Player Pro* (Oleg Brailean).
+**Bookzor** is a native Android audiobook player designed to stream audiobooks on-demand directly from magnet links discovered via **AudioBookBay (ABB)** as well as offline audiobooks saved to device storage. It pairs sequential BitTorrent streaming technology with ergonomic audiobook playback controls.
 
 ---
 
@@ -12,7 +12,7 @@
 
 - **Target OS:** Android 12 (API 31) through Android 14 (API 34).
 - **Minimum SDK:** Android 8.0 (API Level 26).
-- **Primary Test Device:** Samsung Galaxy Tab A7 (`SM-T505`), Android 12, `arm64-v8a`.
+- **Target Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 - **Form Factors:** Android Phones and Tablets (adaptive Compose layouts).
 - **Current App Version:** `1.0.3` (`versionCode = 4`).
 
@@ -98,7 +98,7 @@
 
 ---
 
-### 3.8. Oleg Brailean-Inspired UI (`feature:player`)
+### 3.8. Player UI & Controls (`feature:player`)
 
 - **FR-UI-01 (Dual Progress Trackers):** Total book tracker (duration, elapsed, %) and chapter/track tracker.
 - **FR-UI-02 (Fine Scrubbing):** Vertical drag thresholds (100%, 50%, 25%, 10% scrub rate).

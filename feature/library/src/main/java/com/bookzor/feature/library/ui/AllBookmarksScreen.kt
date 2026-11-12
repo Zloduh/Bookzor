@@ -114,7 +114,7 @@ fun AllBookmarksScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     groups.filter { it.bookmarks.isNotEmpty() }.forEach { group ->
-                        // Book Title Header (Oleg Brailean style banner)
+                        // Book Title Header banner
                         item {
                             Row(
                                 modifier = Modifier

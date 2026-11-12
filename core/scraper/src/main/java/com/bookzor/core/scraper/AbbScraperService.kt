@@ -21,7 +21,7 @@ class AbbScraperService(
         .build()
 ) {
 
-    private val userAgent = "Mozilla/5.0 (Linux; Android 12; SM-T505) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    private val userAgent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     suspend fun search(query: String, page: Int = 1): Resource<List<BookSearchResult>> = withContext(Dispatchers.IO) {
         val domain = domainManager.getActiveDomain()

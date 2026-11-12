@@ -1,6 +1,6 @@
 # Bookzor — Visual Design & UI Specification
 
-Modeled directly after **MP3 Audiobook Player Pro** (Oleg Brailean), adapted for modern Android Jetpack Compose and Material 3 OLED themes.
+Engineered for modern Android Jetpack Compose and Material 3 OLED themes.
 
 ---
 
@@ -11,7 +11,7 @@ Modeled directly after **MP3 Audiobook Player Pro** (Oleg Brailean), adapted for
   - Background: `#000000` (Pure black for battery savings & bedside reading)
   - Surface: `#121212` (Card and bottom sheet surfaces)
   - Surface Variant: `#1E1E1E`
-  - Accent / Primary: `#FF5722` (Warm Amber/Terracotta Orange — Oleg Brailean signature)
+  - Accent / Primary: `#FF5722` (Warm Amber/Terracotta Orange)
   - On Primary: `#FFFFFF`
   - Text Primary: `#FFFFFF`
   - Text Secondary: `#B0B0B0`
@@ -22,7 +22,7 @@ Modeled directly after **MP3 Audiobook Player Pro** (Oleg Brailean), adapted for
 
 ## 📐 2. Screen Anatomy & Layouts
 
-### 2.1. Main Player Screen (Oleg Brailean Deck)
+### 2.1. Main Player Screen (Control Deck)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -128,7 +128,7 @@ Modeled directly after **MP3 Audiobook Player Pro** (Oleg Brailean), adapted for
 
 ---
 
-## 📱 3. Tablet Adaptive Layout (Samsung Galaxy Tab A7)
+## 📱 3. Tablet Adaptive Layout
 
 On tablet screens (width >= 600dp), the UI switches to a **Split-View Canvas**:
 - **Left Column (45% width):** Large Cover Art + Book Metadata + Overall Progress + Chapter Progress & Control Deck.
@@ -147,7 +147,7 @@ Modeled for immediate exploration of related works without manual typing:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **Player Screen Placement:** Positioned directly beneath `OlegBookStrip` on both phone portrait and tablet split-view layouts.
+- **Player Screen Placement:** Positioned directly beneath `BookDetailStrip` on both phone portrait and tablet split-view layouts.
 - **Library Card Placement:** Positioned directly below format and offline badges on every `LibraryBookCard`.
 - **Interactive Details Modal:** Tapping `ℹ️` on any library card displays a modal with book cover, format, duration, and one-tap action buttons:
   - `[ 👤 More books by <Author> ]`

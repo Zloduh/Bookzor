@@ -5,7 +5,7 @@
 ## 🐛 Resolved Bug Reports
 
 ### Bug 1: Android 12–14 `ForegroundServiceDidNotStartInTimeException` Crash
-- **Observed Behavior:** On Android 12+ (e.g. Samsung Galaxy Tab A7), launching the app or starting audio playback intermittently triggered an ANR crash with `android.app.ForegroundServiceDidNotStartInTimeException: Context.startForegroundService() did not then call Service.startForeground()`.
+- **Observed Behavior:** On Android 12+, launching the app or starting audio playback intermittently triggered an ANR crash with `android.app.ForegroundServiceDidNotStartInTimeException: Context.startForegroundService() did not then call Service.startForeground()`.
 - **Root Cause:**
   1. `MainActivity.onCreate()` prematurely called `ensureServiceStarted()` before ExoPlayer or audio tracks were ready.
   2. `PlaybackService.onStartCommand()` initiated asynchronous media loading before invoking `startForeground()`, exceeding Android's 5-second watchdog budget.
@@ -63,7 +63,7 @@
 - **User Need:** When listening to or viewing a book, easily find other books by that same author or voice actor.
 - **Implementation:**
   - **Player Screen:**
-    - Clickable Author and Narrator in `OlegBookStrip`.
+    - Clickable Author and Narrator in `BookDetailStrip`.
     - Dedicated discovery chips row below the top strip:
       - `[ 👤 More by <Author> ]`
       - `[ 🎙️ Voice: <Narrator> ]`

@@ -1,128 +1,104 @@
-# Bookzor 🎧 (v1.0.3)
+# Bookzor 🎧
 
-An advanced Android audiobook streaming player designed to stream audiobooks directly from **AudioBookBay (ABB)** magnet links and local storage, pairing an embedded sequential BitTorrent engine with the ergonomics of *MP3 Audiobook Player Pro* (Oleg Brailean).
-
----
-
-## 🛠️ What's New in v1.0.3
-
-- **🔖 Bookmark & Resume Fix:** After closing and reopening the app, the scrubber no longer jumps to the end. Chapter/book durations are now persisted and restored, and playback position is saved periodically and on app close.
-- **🎯 Accurate Bookmark Jumps:** Bookmarks open the correct chapter at the exact saved time (no smart-rewind offset), from the Player, Library and Bookmarks screens.
-- **✨ Bookmark Polish:** One-tap "Bookmark at X" and quick-add button on the player deck, bookmark count, timeline tick markers, tap-to-seek on the scrubber, and editable bookmark notes with chapter labels.
-
-## 🚀 What's New in v1.0.2 & v1.0.1
-
-- **🔎 Search by Author & Voice Actor (Narrator) in Library & Player:**
-  - One-tap discovery chips on both the **Player Screen** and **Library Book Cards**:
-    - `👤 More by [Author]`
-    - `🎙️ Voice: [Narrator]`
-    - `ℹ️ Details` (opens the full book page with synopsis, chapters, and file inspector).
-  - Tapping author or narrator anywhere in the app instantly searches AudioBookBay without typing.
-  - **Real-Time Library Search Bar:** Type to filter local books in real-time by title, author, or narrator, with a one-tap banner to search AudioBookBay for additional titles.
-- **📁 Public Storage & Survives App Reinstalls:**
-  - Downloaded audiobooks are saved directly to `/storage/emulated/0/Download/Audiobooks/`.
-  - Books and downloads survive app uninstalls, re-installations, and updates.
-  - Sideloading support: drop any `.m4b` or `.mp3` files into `Download/Audiobooks` and the app auto-indexes them.
-- **🤖 Automatic Local Audiobook Scanner & Deduplication Engine:**
-  - Auto-scans `Download/Audiobooks/` on startup and on navigating to the Library screen.
-  - Links downloaded single-file/folder torrents back to their AudioBookBay parent entries, preserving cover art thumbnails, chapters, and metadata.
-  - Automatically deduplicates ghost database entries referencing identical audio files or titles.
-- **🔄 In-App Auto-Updater:**
-  - Checks public GitHub releases ([`Zloduh/bookzor-releases`](https://github.com/Zloduh/bookzor-releases)) automatically.
-  - In-app download with a live percentage and MB progress indicator.
-  - Prompts the native Android package installer via `FileProvider` without needing a computer, ADB, or USB cables.
-- **📋 In-App Log Collector & One-Tap Share:**
-  - Packages device specs, memory status, storage metrics, and the last 500 lines of logcat into a compressed `.zip` archive.
-  - Opens Android's native share sheet (Gmail, Google Drive, Telegram, QuickShare, etc.) for zero-friction debugging.
-- **🛡️ Android 12–14 Foreground Service Watchdog Hardening:**
-  - Resolved `ForegroundServiceDidNotStartInTimeException` ANRs.
-  - Immediate `startForeground()` with `MediaStyle` notification on `PlaybackService` initialization.
+A modern, high-performance native Android audiobook player engineered for seamless on-demand BitTorrent streaming, direct catalog discovery, and offline library playback.
 
 ---
 
-## 🎯 Core Features
+## ✨ Features
 
-### 1. AudioBookBay (ABB) Direct Streaming & Discovery
-- **Live In-App Search:** Search titles, authors, and narrators with normalized queries.
-- **Mirror Failover Engine:** Dynamically switches between active ABB mirrors (`.lu`, `.is`, `.nl`, `.se`, etc.).
-- **Zero Captchas / Ad-Free:** Directly parses book metadata, info hashes, and trackers into standard magnet links.
-- **Selective File Downloads:** Choose specific chapters/parts in multi-file torrents to conserve device storage.
+### ⚡ Sequential Torrent Streaming
+- **Stream on Demand:** Stream audiobooks directly from magnet links or info hashes without waiting for the full download to complete.
+- **Embedded libtorrent Engine:** High-performance C++ `libtorrent4j` sequential piece scheduler prioritizing audio playback buffers and MP4 `moov` metadata atoms.
+- **Local Loopback Streaming Server:** Internal HTTP range streaming server feeding audio smoothly into Google ExoPlayer.
+- **Selective File Downloads:** Pick individual chapters or parts in multi-file releases to save device storage.
 
-### 2. Sequential BitTorrent Engine
-- **Embedded C++ libtorrent4j:** Targets `arm64-v8a` with hardware-accelerated crypto.
-- **Sequential Piece Scheduler:** Prioritizes playback window pieces, read-ahead buffer, and `moov` MP4 index atoms located at the EOF of `.m4b` files.
-- **Local HTTP 1.1 Range Loopback Server:** Streams directly into `ExoPlayer` via `127.0.0.1:8080/stream` supporting standard HTTP `206 Partial Content` requests.
+### 🔍 Discovery & Catalog
+- **Integrated Catalog Search:** Live search by title, author, and narrator.
+- **Mirror Failover Engine:** Automatically discovers and connects to the healthiest active mirror.
+- **One-Tap Discovery Chips:** Instant links to explore more works by the current author or voice actor.
+- **Direct Magnet & Link Input:** Paste any standard BitTorrent magnet link or HTTP URL to stream instantly.
 
-### 3. Oleg Brailean Ergonomic Control Deck
-- **Fine-Scrubbing Progress Deck:** Holds playhead position with vertical drag sensitivity (100%, 50%, 25%, 10% scrub rate).
-- **Dual Jump Buttons:** Independent forward (+30s) and rewind (-15s) intervals, customizable in settings.
-- **Speed & Volume Boost:** Variable playback speed (0.5x – 3.0x with pitch correction) and hardware Loudness Enhancer (+0dB to +12dB).
-- **Sleep Timer & Shake-to-Reset:** Smooth volume fade-out over final 30 seconds; shake gesture resets timer.
-- **Bookmarks & Annotations:** Save timestamps with custom notes; jump or delete with a tap.
+### 🎛️ Audio Controls & Playback
+- **Fine-Grained Scrubbing:** Smooth, responsive timeline scrubber with bookmark tick markers and tap-to-seek.
+- **Custom Jump Intervals:** Fully customizable forward and rewind intervals (5s to 90s) persisted across the app.
+- **Variable Speed & Loudness Boost:** Pitch-corrected playback speeds (0.5x to 3.0x) and hardware loudness boost up to +12dB.
+- **Smart Rewind:** Automatically rewinds 10–30 seconds after long pauses so you never lose your place.
+- **Sleep Timer:** Countdown timer with gentle 15-second volume fade-out, End-of-Chapter mode, and optional shake-to-reset.
 
-### 4. Continuous Lifecycle & Background Playback
-- **Persistent MediaSessionService:** Runs as a dedicated foreground service with lockscreen and notification media controls.
-- **Smart App Swipe-Away Handling:** Audio continues playing when the app is swiped away from recent apps; automatically terminates when paused.
-- **State Persistence:** Room database (`BookzorDatabase`) records millisecond playback positions and auto-resumes cold starts exactly where you left off.
+### 🔖 Bookmarks & Notes
+- **One-Tap Bookmarking:** Save timestamps instantly from the player deck or with custom notes.
+- **Global Bookmarks Manager:** View, edit, filter, and jump to bookmarks across your entire audio library.
+
+### 📁 Offline Library & Sideloading
+- **Public Storage Persistence:** Audio files save directly to device storage (`Download/Audiobooks/`), ensuring books survive app updates or re-installations.
+- **Local Scanner:** Automatically scans and indexes sideloaded `.m4b`, `.mp3`, and folder-based audiobooks.
+- **Listen Later Shelf:** Curate a dedicated queue of books you plan to listen to next.
+
+### 🔄 In-App Updates & Diagnostics
+- **One-Tap Updates:** Check for, download, and install latest releases directly from GitHub.
+- **Diagnostic Log Export:** Easily share compressed diagnostic logs for troubleshooting.
 
 ---
 
-## 🏗️ Multi-Module Architecture
+## 📱 Platform & Requirements
+
+- **Operating System:** Android 8.0 (API level 26) and newer
+- **Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`
+- **Form Factors:** Optimized for both Android phones and tablets with responsive adaptive layouts
+
+---
+
+## 📥 Download & Releases
+
+Download the latest signed APK directly from the [GitHub Releases](https://github.com/Zloduh/Bookzor/releases) page.
+
+---
+
+## 🏗️ Architecture
+
+Bookzor is built with modern Android development standards using a multi-module architecture:
 
 ```
 Bookzor/
-├── app/                  # Application class, Navigation graph, MainActivity, Updater, Scanner
+├── app/                  # Application startup, Navigation, Scanner, Updater, MainActivity
 ├── core/
-│   ├── common/           # Dispatchers, ThemeManager, Result wrapper
-│   ├── database/         # Room DB, Entities (Books, Tracks, Bookmarks, PlaybackState), DAOs
-│   ├── player/           # ExoPlayer, PlaybackService, MediaSession, LoudnessEnhancer
-│   ├── scraper/          # ABB HTML parser (Jsoup), DomainManager, MagnetBuilder
+│   ├── common/           # UserPreferencesRepository, ThemeManager, Dispatchers, Models
+│   ├── database/         # Room Database, DAOs, Entities (Books, Tracks, Bookmarks, PlaybackState)
+│   ├── player/           # ExoPlayer, PlaybackService, MediaSession, SleepTimerController
+│   ├── scraper/          # Catalog scraper (Jsoup), DomainManager, MagnetBuilder
 │   └── torrent/          # libtorrent4j session, SequentialPieceScheduler, TorrentStreamServer
 └── feature/
-    ├── catalog/          # ABB Discovery, live search, direct magnet dialog
-    ├── detail/           # Book inspection, torrent file selector, author/narrator chips
-    ├── library/          # Books screen, To-Read shelf, Global Bookmarks, search filter
-    └── player/           # Portrait & tablet landscape Oleg Brailean decks, bottom sheets
+    ├── catalog/          # Discovery catalog, live search, direct magnet dialog
+    ├── detail/           # Audiobook details, chapter inspector, file download picker
+    ├── library/          # Library bookshelf, Listen Later shelf, Global Bookmarks
+    └── player/           # Adaptive player deck, chapter drawer, playback controls
 ```
 
 ---
 
-## 📱 Hardware & Environment
+## 🛠️ Building from Source
 
-- **Target Device:** Samsung Galaxy Tab A7 (`SM-T505`, Android 12, `arm64-v8a`).
-- **SDK Targets:** Min SDK 26, Target SDK 34, Compile SDK 34.
-- **JDK:** OpenJDK 17 (`/usr/lib/jvm/java-17-openjdk`).
-- **Storage Path:** `/storage/emulated/0/Download/Audiobooks/`.
-- **Public Releases Repo:** [`https://github.com/Zloduh/bookzor-releases`](https://github.com/Zloduh/bookzor-releases).
-- **Source Code Repo:** [`https://github.com/Zloduh/Bookzor`](https://github.com/Zloduh/Bookzor).
+### Prerequisites
+- Android Studio Hedgehog (2023.1.1) or newer
+- JDK 17
+- Android SDK 34
 
----
-
-## 🛠️ Build & Installation
-
-### Option 1: In-App Update (Recommended)
-1. Open Bookzor on the device.
-2. Tap `☰` -> **Settings** -> **Check for Updates**.
-3. Tap **Download & Install**.
-
-### Option 2: Build from Source
+### Build Command
 ```bash
+# Clone the repository
+git clone https://github.com/Zloduh/Bookzor.git
+cd Bookzor
+
 # Build debug APK
-GRADLE_USER_HOME=/run/media/tpredrag/Data/Projekti/Bookzor/.gradle ./gradlew assembleDebug
+./gradlew assembleDebug
 
-# Deploy via ADB
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-
-# Launch MainActivity
-adb shell am start -n com.bookzor.app/.MainActivity
+# Build release APK
+./gradlew assembleRelease
 ```
+The built APK will be located at `app/build/outputs/apk/release/app-release.apk` (or `debug/app-debug.apk`).
 
 ---
 
-## 📚 Technical Documentation
+## 📄 License
 
-- **[`REQUIREMENTS.md`](./REQUIREMENTS.md):** Full functional and non-functional requirements specification.
-- **[`ARCHITECTURE.md`](./ARCHITECTURE.md):** Deep-dive on streaming pipeline, storage, updater, and database schema.
-- **[`ROADMAP_AND_EPICS.md`](./ROADMAP_AND_EPICS.md):** Completed epics, feature stories, and verification checklists.
-- **[`ENVIRONMENT_SETUP.md`](./ENVIRONMENT_SETUP.md):** Developer setup instructions for Arch/CachyOS, Ubuntu, and macOS.
-- **[`UI_DESIGN_SPEC.md`](./UI_DESIGN_SPEC.md):** Oleg Brailean design tokens, layout dimensions, and Compose guidelines.
+This project is licensed under the Apache License 2.0.

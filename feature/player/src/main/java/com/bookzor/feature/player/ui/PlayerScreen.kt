@@ -186,7 +186,7 @@ fun PlayerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Top Book Metadata Strip
-                        OlegBookStrip(
+                        BookDetailStrip(
                             book = book,
                             totalDurationMs = effectiveBookTotalDurationMs,
                             elapsedMs = totalBookElapsedMs,
@@ -218,7 +218,7 @@ fun PlayerScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        OlegPlayerDeck(
+                        BookzorPlayerDeck(
                             chapterTitle = activeChapterTitle,
                             positionMs = positionMs,
                             durationMs = chapterDurationMs,
@@ -279,7 +279,7 @@ fun PlayerScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // 1. Top Book Strip
-                    OlegBookStrip(
+                    BookDetailStrip(
                         book = book,
                         totalDurationMs = effectiveBookTotalDurationMs,
                         elapsedMs = totalBookElapsedMs,
@@ -350,7 +350,7 @@ fun PlayerScreen(
                     }
 
                     // 4. Bottom Control Deck Panel
-                    OlegPlayerDeck(
+                    BookzorPlayerDeck(
                         chapterTitle = activeChapterTitle,
                         positionMs = positionMs,
                         durationMs = chapterDurationMs,
@@ -442,7 +442,7 @@ fun PlayerScreen(
 }
 
 @Composable
-fun OlegBookStrip(
+fun BookDetailStrip(
     book: BookEntity?,
     totalDurationMs: Long,
     elapsedMs: Long,

@@ -46,7 +46,7 @@ class AppUpdateManager(
 ) {
     companion object {
         private const val GITHUB_LATEST_RELEASE_URL =
-            "https://api.github.com/repos/Zloduh/bookzor-releases/releases/latest"
+            "https://api.github.com/repos/Zloduh/Bookzor/releases/latest"
     }
 
     private val httpClient = OkHttpClient.Builder()

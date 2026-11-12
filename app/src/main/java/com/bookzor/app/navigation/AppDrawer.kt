@@ -55,7 +55,7 @@ fun AppDrawerContent(
             .background(Color(0xFF141414))
             .padding(vertical = 24.dp)
     ) {
-        // Oleg Brailean Header
+        // App Brand Header
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = "BOOKZOR",
