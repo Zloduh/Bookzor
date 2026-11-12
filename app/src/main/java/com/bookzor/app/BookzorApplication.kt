@@ -56,7 +56,8 @@ class BookzorApplication : Application() {
         playerController = AudioPlayerController(
             context = this,
             playbackStateDao = database.playbackStateDao(),
-            bookDao = database.bookDao()
+            bookDao = database.bookDao(),
+            audioTrackDao = database.audioTrackDao()
         )
     }
 }

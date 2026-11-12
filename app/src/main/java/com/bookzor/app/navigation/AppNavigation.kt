@@ -98,7 +98,7 @@ fun AppNavigation(
 
     val activeBook by produceState<BookEntity?>(initialValue = null, activeInfoHash) {
         if (activeInfoHash != null) {
-            value = withContext(Dispatchers.IO) { database.bookDao().getBook(activeInfoHash) }
+            database.bookDao().observeBook(activeInfoHash).collect { value = it }
         } else {
             value = null
         }
@@ -155,6 +155,14 @@ fun AppNavigation(
                     val bookmarksFlow = database.bookmarkDao().observeBookmarks(infoHash)
                     val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
 
+                    val activeTrackDuration = tracks.getOrNull(playerState.currentTrackIndex)?.durationMs ?: 0L
+                    val effectiveChapterDurationMs = when {
+                        playerState.durationMs > 0L -> playerState.durationMs
+                        activeTrackDuration > 0L -> activeTrackDuration
+                        tracks.size <= 1 && (activeBook?.totalDurationMs ?: 0L) > 0L -> activeBook?.totalDurationMs ?: 0L
+                        else -> 0L
+                    }
+
                     PlayerScreen(
                         book = activeBook,
                         tracks = tracks,
@@ -162,7 +170,7 @@ fun AppNavigation(
                         isPlaying = playerState.isPlaying,
                         isBuffering = playerState.isBuffering,
                         positionMs = playerState.currentPositionMs,
-                        chapterDurationMs = playerState.durationMs,
+                        chapterDurationMs = effectiveChapterDurationMs,
                         playbackSpeed = playerState.playbackSpeed,
                         volumeBoostMb = playerState.volumeBoostMb,
                         pieces = torrentStatus?.pieces,
@@ -196,49 +204,104 @@ fun AppNavigation(
                             val nextIdx = playerState.currentTrackIndex + 1
                             if (nextIdx < tracks.size) {
                                 val nextUrl = streamServer.getStreamUrl(infoHash, nextIdx)
-                                playerController.playStream(nextUrl, infoHash, nextIdx)
+                                playerController.playStream(
+                                    streamUrl = nextUrl,
+                                    infoHash = infoHash,
+                                    trackIndex = nextIdx,
+                                    startPositionMs = 0L,
+                                    title = activeBook?.title,
+                                    artist = activeBook?.author,
+                                    applySmartRewind = false
+                                )
                             }
                         },
                         onPrevTrack = {
                             val prevIdx = maxOf(0, playerState.currentTrackIndex - 1)
                             val prevUrl = streamServer.getStreamUrl(infoHash, prevIdx)
-                            playerController.playStream(prevUrl, infoHash, prevIdx)
+                            playerController.playStream(
+                                streamUrl = prevUrl,
+                                infoHash = infoHash,
+                                trackIndex = prevIdx,
+                                startPositionMs = 0L,
+                                title = activeBook?.title,
+                                artist = activeBook?.author,
+                                applySmartRewind = false
+                            )
                         },
                         onSelectTrack = { index ->
                             val trackUrl = streamServer.getStreamUrl(infoHash, index)
-                            playerController.playStream(trackUrl, infoHash, index)
+                            playerController.playStream(
+                                streamUrl = trackUrl,
+                                infoHash = infoHash,
+                                trackIndex = index,
+                                startPositionMs = 0L,
+                                title = activeBook?.title,
+                                artist = activeBook?.author,
+                                applySmartRewind = false
+                            )
                         },
                         onSpeedChange = { speed -> playerController.setSpeed(speed) },
                         onBoostChange = { boost -> playerController.setLoudnessBoost(boost) },
                         onBookmark = {
                             if (infoHash.isNotEmpty()) {
-                                scope.launch {
+                                val currentTrack = playerState.currentTrackIndex
+                                val currentPos = playerState.currentPositionMs
+                                scope.launch(Dispatchers.IO) {
                                     database.bookmarkDao().insertBookmark(
                                         com.bookzor.core.database.entity.BookmarkEntity(
                                             infoHash = infoHash,
-                                            trackIndex = playerState.currentTrackIndex,
-                                            positionMs = playerState.currentPositionMs
+                                            trackIndex = currentTrack,
+                                            positionMs = currentPos
                                         )
                                     )
                                 }
                             }
                         },
-                        onAddBookmarkWithNote = { note ->
+                        onSelectBookmark = { bookmark ->
                             if (infoHash.isNotEmpty()) {
-                                scope.launch {
+                                val targetTrack = bookmark.trackIndex
+                                val targetPos = bookmark.positionMs
+                                if (!playerController.hasMediaItem ||
+                                    playerState.currentInfoHash != infoHash ||
+                                    playerState.currentTrackIndex != targetTrack
+                                ) {
+                                    val streamUrl = streamServer.getStreamUrl(infoHash, targetTrack)
+                                    playerController.playStream(
+                                        streamUrl = streamUrl,
+                                        infoHash = infoHash,
+                                        trackIndex = targetTrack,
+                                        startPositionMs = targetPos,
+                                        title = activeBook?.title,
+                                        artist = activeBook?.author,
+                                        applySmartRewind = false
+                                    )
+                                } else {
+                                    playerController.seekTo(targetPos)
+                                }
+                            }
+                        },
+                        onAddBookmarkWithNote = { targetPosMs, note ->
+                            if (infoHash.isNotEmpty()) {
+                                val currentTrack = playerState.currentTrackIndex
+                                scope.launch(Dispatchers.IO) {
                                     database.bookmarkDao().insertBookmark(
                                         com.bookzor.core.database.entity.BookmarkEntity(
                                             infoHash = infoHash,
-                                            trackIndex = playerState.currentTrackIndex,
-                                            positionMs = playerState.currentPositionMs,
+                                            trackIndex = currentTrack,
+                                            positionMs = targetPosMs,
                                             note = note
                                         )
                                     )
                                 }
                             }
                         },
+                        onUpdateBookmarkNote = { bookmark, updatedNote ->
+                            scope.launch(Dispatchers.IO) {
+                                database.bookmarkDao().updateBookmarkNote(bookmark.id, updatedNote)
+                            }
+                        },
                         onDeleteBookmark = { bookmark ->
-                            scope.launch { database.bookmarkDao().deleteBookmark(bookmark) }
+                            scope.launch(Dispatchers.IO) { database.bookmarkDao().deleteBookmark(bookmark) }
                         },
                         onSearchQuery = { query ->
                             navController.navigate(Screen.Catalog.createRoute(query))
@@ -311,16 +374,17 @@ fun AppNavigation(
                                 navController.navigate(Screen.Player.route)
                             }
                         },
-                        onPlayBookmark = { book, positionMs ->
+                        onPlayBookmark = { book, bookmark ->
                             scope.launch {
-                                val streamUrl = streamServer.getStreamUrl(book.infoHash, 0)
+                                val streamUrl = streamServer.getStreamUrl(book.infoHash, bookmark.trackIndex)
                                 playerController.playStream(
                                     streamUrl = streamUrl,
                                     infoHash = book.infoHash,
-                                    trackIndex = 0,
-                                    startPositionMs = positionMs,
+                                    trackIndex = bookmark.trackIndex,
+                                    startPositionMs = bookmark.positionMs,
                                     title = book.title,
-                                    artist = book.author
+                                    artist = book.author,
+                                    applySmartRewind = false
                                 )
                                 navController.navigate(Screen.Player.route)
                             }
@@ -480,9 +544,18 @@ fun AppNavigation(
                                     trackIndex = bookmark.trackIndex,
                                     startPositionMs = bookmark.positionMs,
                                     title = book.title,
-                                    artist = book.author
+                                    artist = book.author,
+                                    applySmartRewind = false
                                 )
                                 navController.navigate(Screen.Player.route)
+                            }
+                        },
+                        onUpdateBookmarkNote = { mark, updatedNote ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    database.bookmarkDao().updateBookmarkNote(mark.id, updatedNote)
+                                }
+                                bookmarkRefreshKey++
                             }
                         },
                         onDeleteBookmark = { mark ->
@@ -694,14 +767,36 @@ fun AppNavigation(
 
             // Docked MiniPlayer when on other screens
             if (!isPlayerScreen && activeBook != null) {
+                val miniDurationMs = if (playerState.durationMs > 0L) {
+                    playerState.durationMs
+                } else {
+                    activeBook?.totalDurationMs ?: 0L
+                }
                 MiniPlayerBar(
                     title = activeBook?.title ?: "Audiobook",
                     author = activeBook?.author,
                     coverUrl = activeBook?.coverUrl,
                     isPlaying = playerState.isPlaying,
                     positionMs = playerState.currentPositionMs,
-                    durationMs = playerState.durationMs,
-                    onTogglePlayPause = { playerController.togglePlayPause() },
+                    durationMs = miniDurationMs,
+                    onTogglePlayPause = {
+                        val infoHash = activeInfoHash ?: ""
+                        if (!playerController.hasMediaItem && infoHash.isNotEmpty()) {
+                            val trackIdx = playerState.currentTrackIndex
+                            val posMs = playerState.currentPositionMs
+                            val streamUrl = streamServer.getStreamUrl(infoHash, trackIdx)
+                            playerController.playStream(
+                                streamUrl = streamUrl,
+                                infoHash = infoHash,
+                                trackIndex = trackIdx,
+                                startPositionMs = posMs,
+                                title = activeBook?.title,
+                                artist = activeBook?.author
+                            )
+                        } else {
+                            playerController.togglePlayPause()
+                        }
+                    },
                     onJumpBack = { playerController.jumpBack(15) },
                     onJumpForward = { playerController.jumpForward(15) },
                     onExpand = {

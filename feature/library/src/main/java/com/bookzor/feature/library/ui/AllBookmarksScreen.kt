@@ -21,12 +21,23 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bookzor.core.database.entity.BookEntity
 import com.bookzor.core.database.entity.BookmarkEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class BookBookmarksGroup(
     val book: BookEntity,
@@ -47,10 +61,13 @@ data class BookBookmarksGroup(
 fun AllBookmarksScreen(
     groups: List<BookBookmarksGroup>,
     onSelectBookmark: (BookEntity, BookmarkEntity) -> Unit,
+    onUpdateBookmarkNote: (BookmarkEntity, String?) -> Unit = { _, _ -> },
     onDeleteBookmark: (BookmarkEntity) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var editingBookmark by remember { mutableStateOf<BookmarkEntity?>(null) }
+    var editingNoteText by remember { mutableStateOf("") }
     Scaffold(
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
@@ -126,7 +143,10 @@ fun AllBookmarksScreen(
                             Divider(color = Color(0xFF282828), thickness = 0.5.dp)
                         }
 
-                        items(group.bookmarks) { bookmark ->
+                        items(group.bookmarks, key = { it.id }) { bookmark ->
+                            val dateStr = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(bookmark.createdAt))
+                            val totalSec = bookmark.positionMs / 1000
+                            val formatted = String.format("%d:%02d:%02d", totalSec / 3600, (totalSec % 3600) / 60, totalSec % 60)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -135,6 +155,23 @@ fun AllBookmarksScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFFF5722))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = formatted,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = bookmark.note?.ifBlank { "Chapter ${bookmark.trackIndex + 1}" }
@@ -144,24 +181,37 @@ fun AllBookmarksScreen(
                                         fontSize = 14.sp
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    val totalSec = bookmark.positionMs / 1000
-                                    val formatted = String.format("%d:%02d:%02d", totalSec / 3600, (totalSec % 3600) / 60, totalSec % 60)
                                     Text(
-                                        text = formatted,
+                                        text = "Chapter ${bookmark.trackIndex + 1} • $dateStr",
                                         color = Color.Gray,
                                         fontSize = 12.sp
                                     )
                                 }
 
                                 IconButton(
+                                    onClick = {
+                                        editingBookmark = bookmark
+                                        editingNoteText = bookmark.note ?: ""
+                                    },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Note",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+
+                                IconButton(
                                     onClick = { onDeleteBookmark(bookmark) },
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete",
                                         tint = Color(0xFFFF5252),
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -171,5 +221,54 @@ fun AllBookmarksScreen(
                 }
             }
         }
+    }
+
+    if (editingBookmark != null) {
+        val target = editingBookmark!!
+        AlertDialog(
+            onDismissRequest = { editingBookmark = null },
+            containerColor = Color(0xFF1E1E1E),
+            title = {
+                Text(
+                    text = "Edit Bookmark Note",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = editingNoteText,
+                    onValueChange = { editingNoteText = it },
+                    placeholder = { Text("Add a note...", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFFF5722),
+                        unfocusedBorderColor = Color(0xFF333333),
+                        focusedContainerColor = Color(0xFF121212),
+                        unfocusedContainerColor = Color(0xFF121212)
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateBookmarkNote(target, editingNoteText.trim().ifEmpty { null })
+                        editingBookmark = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
+                ) {
+                    Text("Save", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { editingBookmark = null }) {
+                    Text("Cancel", color = Color.LightGray)
+                }
+            }
+        )
     }
 }

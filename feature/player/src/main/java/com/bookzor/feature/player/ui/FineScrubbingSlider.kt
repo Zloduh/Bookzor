@@ -3,6 +3,7 @@ package com.bookzor.feature.player.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +39,7 @@ fun FineScrubbingSlider(
     durationMs: Long,
     pieces: BooleanArray?,
     onSeek: (Long) -> Unit,
+    bookmarkPositionsMs: List<Long> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -45,8 +47,13 @@ fun FineScrubbingSlider(
     var dragProgress by remember { mutableFloatStateOf(0f) }
     var scrubRateText by remember { mutableStateOf("Normal Scrubbing") }
 
-    val safeDuration = if (durationMs > 0) durationMs else 1L
-    val currentRatio = if (isDragging) dragProgress else (positionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+    val hasValidDuration = durationMs > 0L
+    val safeDuration = if (hasValidDuration) durationMs else 1L
+    val currentRatio = when {
+        isDragging -> dragProgress
+        hasValidDuration -> (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        else -> 0f
+    }
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -73,7 +80,16 @@ fun FineScrubbingSlider(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(44.dp)
-                .pointerInput(safeDuration) {
+                .pointerInput(hasValidDuration, safeDuration) {
+                    if (!hasValidDuration) return@pointerInput
+                    detectTapGestures { offset ->
+                        val tapRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                        val targetMs = (tapRatio * safeDuration).toLong()
+                        onSeek(targetMs)
+                    }
+                }
+                .pointerInput(hasValidDuration, safeDuration) {
+                    if (!hasValidDuration) return@pointerInput
                     var startDragRatio = 0f
                     var accumulatedDx = 0f
 
@@ -160,7 +176,22 @@ fun FineScrubbingSlider(
                     size = Size(playedWidth, trackHeight)
                 )
 
-                // 4. Scrubbing Thumb
+                // 4. Bookmark Tick Markers on Timeline
+                if (hasValidDuration && bookmarkPositionsMs.isNotEmpty()) {
+                    val tickWidth = 3.dp.toPx()
+                    val tickHeight = 12.dp.toPx()
+                    for (bmPos in bookmarkPositionsMs) {
+                        val bmRatio = (bmPos.toFloat() / safeDuration).coerceIn(0f, 1f)
+                        val bmX = (canvasWidth * bmRatio).coerceIn(tickWidth / 2, canvasWidth - tickWidth / 2)
+                        drawRoundRect(
+                            color = Color(0xFFFFB74D),
+                            topLeft = Offset(bmX - tickWidth / 2, yCenter - tickHeight / 2),
+                            size = Size(tickWidth, tickHeight)
+                        )
+                    }
+                }
+
+                // 5. Scrubbing Thumb
                 val thumbRadius = if (isDragging) 8.dp.toPx() else 6.dp.toPx()
                 drawCircle(
                     color = Color.White,
@@ -172,8 +203,7 @@ fun FineScrubbingSlider(
 
         // Timestamps below slider: Left elapsed, Right remaining
         Row(modifier = Modifier.fillMaxWidth()) {
-            val currentMs = if (isDragging) (dragProgress * safeDuration).toLong() else positionMs
-            val remainingMs = maxOf(0L, safeDuration - currentMs)
+            val currentMs = if (isDragging && hasValidDuration) (dragProgress * safeDuration).toLong() else positionMs
 
             Text(
                 text = formatDuration(currentMs),
@@ -181,8 +211,14 @@ fun FineScrubbingSlider(
                 style = MaterialTheme.typography.labelSmall
             )
             Spacer(modifier = Modifier.weight(1f))
+            val remainingText = if (hasValidDuration) {
+                val remainingMs = maxOf(0L, safeDuration - currentMs)
+                "-${formatDuration(remainingMs)}"
+            } else {
+                "--:--"
+            }
             Text(
-                text = "-${formatDuration(remainingMs)}",
+                text = remainingText,
                 color = Color.LightGray,
                 style = MaterialTheme.typography.labelSmall
             )

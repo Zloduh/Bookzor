@@ -37,6 +37,7 @@ class AudioPlayerController(
     private val context: Context,
     private val playbackStateDao: PlaybackStateDao? = null,
     private val bookDao: com.bookzor.core.database.dao.BookDao? = null,
+    private val audioTrackDao: com.bookzor.core.database.dao.AudioTrackDao? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ) {
     companion object {
@@ -77,6 +78,7 @@ class AudioPlayerController(
     private var progressTrackingJob: Job? = null
     private var activeInfoHash: String? = null
     private var lastPauseTimestamp: Long = 0L
+    private var lastPersistedDurationKey: String? = null
 
     init {
         instance = this
@@ -86,10 +88,12 @@ class AudioPlayerController(
             val latest = playbackStateDao?.getLatestPlaybackState()
             if (latest != null) {
                 activeInfoHash = latest.infoHash
+                val savedDuration = resolveDurationFromDb(latest.infoHash, latest.currentTrackIndex)
                 _playerState.value = _playerState.value.copy(
                     currentInfoHash = latest.infoHash,
                     currentTrackIndex = latest.currentTrackIndex,
                     currentPositionMs = latest.positionMs,
+                    durationMs = savedDuration,
                     playbackSpeed = latest.playbackSpeed,
                     volumeBoostMb = latest.volumeBoostMb
                 )
@@ -109,11 +113,16 @@ class AudioPlayerController(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val isBuffering = playbackState == Player.STATE_BUFFERING
-                val duration = if (exoPlayer.duration > 0) exoPlayer.duration else 0L
+                val exoDuration = if (exoPlayer.duration > 0) exoPlayer.duration else 0L
+                val effectiveDuration = if (exoDuration > 0L) exoDuration else _playerState.value.durationMs
                 _playerState.value = _playerState.value.copy(
                     isBuffering = isBuffering,
-                    durationMs = duration
+                    durationMs = effectiveDuration
                 )
+                val hash = activeInfoHash
+                if (hash != null && exoDuration > 0L) {
+                    persistDiscoveredDuration(hash, _playerState.value.currentTrackIndex, exoDuration)
+                }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -127,7 +136,11 @@ class AudioPlayerController(
                     delay(4000)
                     if (_playerState.value.isBuffering && !exoPlayer.isPlaying) {
                         try {
+                            val targetPos = _playerState.value.currentPositionMs
                             exoPlayer.prepare()
+                            if (targetPos > 0L) {
+                                exoPlayer.seekTo(targetPos)
+                            }
                             exoPlayer.play()
                         } catch (e: Exception) {
                             Log.w(TAG, "Retry wait: ${e.message}")
@@ -164,24 +177,73 @@ class AudioPlayerController(
         })
     }
 
+    private suspend fun resolveDurationFromDb(infoHash: String, trackIndex: Int): Long {
+        val tracks = audioTrackDao?.getTracks(infoHash).orEmpty()
+        val trackDuration = tracks.firstOrNull { it.trackIndex == trackIndex }?.durationMs
+            ?: tracks.getOrNull(trackIndex)?.durationMs
+            ?: 0L
+        if (trackDuration > 0L) return trackDuration
+        val bookDuration = bookDao?.getBook(infoHash)?.totalDurationMs ?: 0L
+        if (tracks.size <= 1 && bookDuration > 0L) return bookDuration
+        return 0L
+    }
+
+    fun refreshDurationFromDb() {
+        val hash = activeInfoHash ?: _playerState.value.currentInfoHash ?: return
+        val trackIdx = _playerState.value.currentTrackIndex
+        scope.launch(Dispatchers.IO) {
+            val resolved = resolveDurationFromDb(hash, trackIdx)
+            if (resolved > 0L && _playerState.value.durationMs <= 0L) {
+                _playerState.value = _playerState.value.copy(durationMs = resolved)
+            }
+        }
+    }
+
+    private fun persistDiscoveredDuration(infoHash: String, trackIndex: Int, durationMs: Long) {
+        if (durationMs <= 0L) return
+        val key = "$infoHash:$trackIndex:$durationMs"
+        if (lastPersistedDurationKey == key) return
+        lastPersistedDurationKey = key
+        scope.launch(Dispatchers.IO) {
+            audioTrackDao?.updateTrackDuration(infoHash, trackIndex, durationMs)
+            val allTracks = audioTrackDao?.getTracks(infoHash).orEmpty()
+            val sumDuration = if (allTracks.isNotEmpty()) {
+                allTracks.sumOf { if (it.trackIndex == trackIndex) durationMs else it.durationMs }
+            } else {
+                durationMs
+            }
+            val book = bookDao?.getBook(infoHash)
+            if (book != null && sumDuration > book.totalDurationMs) {
+                bookDao?.updateTotalDuration(infoHash, sumDuration)
+            }
+        }
+    }
+
     fun playStream(
         streamUrl: String,
         infoHash: String,
         trackIndex: Int = 0,
         startPositionMs: Long = 0L,
         title: String? = null,
-        artist: String? = null
+        artist: String? = null,
+        applySmartRewind: Boolean = true
     ) {
+        val isSameTrack = _playerState.value.currentInfoHash == infoHash &&
+            _playerState.value.currentTrackIndex == trackIndex
         ensureServiceStarted()
         activeInfoHash = infoHash
 
         scope.launch(Dispatchers.IO) {
             bookDao?.updateLastAccessed(infoHash)
+            val dbDuration = resolveDurationFromDb(infoHash, trackIndex)
+            if (dbDuration > 0L && _playerState.value.durationMs <= 0L) {
+                _playerState.value = _playerState.value.copy(durationMs = dbDuration)
+            }
         }
 
-        // Calculate Smart Rewind if resuming after pause
-        var finalStartPos = startPositionMs
-        if (lastPauseTimestamp > 0) {
+        // Calculate Smart Rewind only when resuming after pause (never when jumping to a bookmark or chapter)
+        var finalStartPos = maxOf(0L, startPositionMs)
+        if (applySmartRewind && lastPauseTimestamp > 0 && startPositionMs > 0) {
             val pausedDurationMs = System.currentTimeMillis() - lastPauseTimestamp
             val rewindMs = when {
                 pausedDurationMs > 24 * 60 * 60 * 1000 -> 60_000L // >24h -> 60s
@@ -191,6 +253,7 @@ class AudioPlayerController(
             }
             finalStartPos = maxOf(0L, startPositionMs - rewindMs)
         }
+        lastPauseTimestamp = 0L
 
         val mediaMetadata = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(title ?: "Audiobook")
@@ -203,7 +266,7 @@ class AudioPlayerController(
             .setMediaMetadata(mediaMetadata)
             .build()
 
-        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.setMediaItem(mediaItem, finalStartPos)
         exoPlayer.prepare()
         if (finalStartPos > 0) {
             exoPlayer.seekTo(finalStartPos)
@@ -213,8 +276,10 @@ class AudioPlayerController(
         _playerState.value = _playerState.value.copy(
             currentInfoHash = infoHash,
             currentTrackIndex = trackIndex,
-            currentPositionMs = finalStartPos
+            currentPositionMs = finalStartPos,
+            durationMs = if (isSameTrack) _playerState.value.durationMs else 0L
         )
+        saveCurrentState(overridePositionMs = finalStartPos)
 
         initLoudnessEnhancer()
     }
@@ -263,19 +328,41 @@ class AudioPlayerController(
     }
 
     fun seekTo(positionMs: Long) {
-        val target = positionMs.coerceIn(0L, maxOf(0L, exoPlayer.duration))
-        exoPlayer.seekTo(target)
+        val maxDuration = when {
+            exoPlayer.duration > 0 -> exoPlayer.duration
+            _playerState.value.durationMs > 0 -> _playerState.value.durationMs
+            else -> Long.MAX_VALUE
+        }
+        val target = positionMs.coerceIn(0L, maxDuration)
+        if (exoPlayer.currentMediaItem != null) {
+            exoPlayer.seekTo(target)
+        }
         _playerState.value = _playerState.value.copy(currentPositionMs = target)
+        saveCurrentState(overridePositionMs = target)
     }
 
     fun jumpBack(seconds: Int = 15) {
-        val target = maxOf(0L, exoPlayer.currentPosition - (seconds * 1000L))
+        val basePos = if (exoPlayer.currentMediaItem != null && exoPlayer.currentPosition >= 0) {
+            exoPlayer.currentPosition
+        } else {
+            _playerState.value.currentPositionMs
+        }
+        val target = maxOf(0L, basePos - (seconds * 1000L))
         seekTo(target)
     }
 
     fun jumpForward(seconds: Int = 30) {
-        val maxDuration = if (exoPlayer.duration > 0) exoPlayer.duration else Long.MAX_VALUE
-        val target = minOf(maxDuration, exoPlayer.currentPosition + (seconds * 1000L))
+        val basePos = if (exoPlayer.currentMediaItem != null && exoPlayer.currentPosition >= 0) {
+            exoPlayer.currentPosition
+        } else {
+            _playerState.value.currentPositionMs
+        }
+        val maxDuration = when {
+            exoPlayer.duration > 0 -> exoPlayer.duration
+            _playerState.value.durationMs > 0 -> _playerState.value.durationMs
+            else -> Long.MAX_VALUE
+        }
+        val target = minOf(maxDuration, basePos + (seconds * 1000L))
         seekTo(target)
     }
 
@@ -313,13 +400,23 @@ class AudioPlayerController(
     private fun startProgressTracker() {
         progressTrackingJob?.cancel()
         progressTrackingJob = scope.launch {
+            var ticks = 0
             while (isActive && exoPlayer.isPlaying) {
                 val currentPos = maxOf(0L, exoPlayer.currentPosition)
-                val duration = maxOf(0L, exoPlayer.duration)
+                val exoDuration = if (exoPlayer.duration > 0) exoPlayer.duration else 0L
+                val effectiveDuration = if (exoDuration > 0L) exoDuration else _playerState.value.durationMs
                 _playerState.value = _playerState.value.copy(
                     currentPositionMs = currentPos,
-                    durationMs = duration
+                    durationMs = effectiveDuration
                 )
+                val hash = activeInfoHash
+                if (hash != null && exoDuration > 0L) {
+                    persistDiscoveredDuration(hash, _playerState.value.currentTrackIndex, exoDuration)
+                }
+                ticks++
+                if (ticks % 10 == 0) {
+                    saveCurrentState(overridePositionMs = currentPos)
+                }
                 delay(500)
             }
         }
@@ -330,11 +427,14 @@ class AudioPlayerController(
         activeInfoHash = infoHash
         scope.launch(Dispatchers.IO) {
             val saved = playbackStateDao?.getPlaybackState(infoHash)
+            val trackIndex = saved?.currentTrackIndex ?: 0
+            val savedDuration = resolveDurationFromDb(infoHash, trackIndex)
             if (saved != null) {
                 _playerState.value = _playerState.value.copy(
                     currentInfoHash = infoHash,
                     currentTrackIndex = saved.currentTrackIndex,
                     currentPositionMs = saved.positionMs,
+                    durationMs = savedDuration,
                     playbackSpeed = saved.playbackSpeed,
                     volumeBoostMb = saved.volumeBoostMb
                 )
@@ -342,17 +442,24 @@ class AudioPlayerController(
                 _playerState.value = _playerState.value.copy(
                     currentInfoHash = infoHash,
                     currentTrackIndex = 0,
-                    currentPositionMs = 0L
+                    currentPositionMs = 0L,
+                    durationMs = savedDuration
                 )
             }
             bookDao?.updateLastAccessed(infoHash)
         }
     }
 
-    fun saveCurrentState() {
-        val hash = activeInfoHash ?: return
+    fun saveCurrentState(overridePositionMs: Long? = null) {
+        val hash = activeInfoHash ?: _playerState.value.currentInfoHash ?: return
         val dao = playbackStateDao ?: return
-        val currentPos = if (exoPlayer.currentPosition > 0) exoPlayer.currentPosition else _playerState.value.currentPositionMs
+        val currentPos = overridePositionMs ?: run {
+            if (exoPlayer.currentMediaItem != null && exoPlayer.currentPosition > 0) {
+                exoPlayer.currentPosition
+            } else {
+                _playerState.value.currentPositionMs
+            }
+        }
         val speed = _playerState.value.playbackSpeed
         val boost = _playerState.value.volumeBoostMb
         val trackIdx = _playerState.value.currentTrackIndex
@@ -362,7 +469,7 @@ class AudioPlayerController(
                 PlaybackStateEntity(
                     infoHash = hash,
                     currentTrackIndex = trackIdx,
-                    positionMs = currentPos,
+                    positionMs = maxOf(0L, currentPos),
                     playbackSpeed = speed,
                     volumeBoostMb = boost,
                     updatedAt = System.currentTimeMillis()

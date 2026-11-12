@@ -36,7 +36,12 @@ class PlaybackService : MediaSessionService() {
         playerController = controller
         val player = controller?.exoPlayer ?: run {
             val db = BookzorDatabase.getInstance(applicationContext)
-            AudioPlayerController(applicationContext, db.playbackStateDao()).exoPlayer
+            AudioPlayerController(
+                applicationContext,
+                db.playbackStateDao(),
+                db.bookDao(),
+                db.audioTrackDao()
+            ).exoPlayer
         }
 
         createNotificationChannel()
@@ -226,6 +231,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        playerController?.saveCurrentState()
         val player = mediaSession?.player
         // Spotify/Audible model: If paused when user swipes app from Recents / Close All, kill the service completely
         if (player == null || !player.isPlaying) {
@@ -240,6 +246,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        playerController?.saveCurrentState()
         mediaSession?.run {
             release()
             mediaSession = null

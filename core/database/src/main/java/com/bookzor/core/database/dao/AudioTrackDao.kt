@@ -23,4 +23,7 @@ interface AudioTrackDao {
 
     @Query("SELECT * FROM audio_tracks WHERE file_name = :fileName OR file_name LIKE '%' || :fileName LIMIT 1")
     suspend fun findTrackByFileName(fileName: String): AudioTrackEntity?
+
+    @Query("UPDATE audio_tracks SET duration_ms = :durationMs WHERE info_hash = :infoHash AND track_index = :trackIndex")
+    suspend fun updateTrackDuration(infoHash: String, trackIndex: Int, durationMs: Long)
 }

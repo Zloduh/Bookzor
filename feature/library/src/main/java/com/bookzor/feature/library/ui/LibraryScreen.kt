@@ -70,7 +70,7 @@ data class LibraryBookItem(
 fun LibraryScreen(
     books: List<LibraryBookItem>,
     onPlayBook: (BookEntity) -> Unit,
-    onPlayBookmark: (BookEntity, Long) -> Unit = { b, _ -> onPlayBook(b) },
+    onPlayBookmark: (BookEntity, com.bookzor.core.database.entity.BookmarkEntity) -> Unit = { b, _ -> onPlayBook(b) },
     onDownloadBook: (BookEntity) -> Unit,
     onDeleteBook: (BookEntity) -> Unit,
     onSearchQuery: (String) -> Unit = {},
@@ -348,6 +348,15 @@ fun LibraryScreen(
                         Text("No bookmarks saved for this book yet.", color = Color.Gray)
                     } else {
                         marks.forEach { mark ->
+                            val totalSec = mark.positionMs / 1000
+                            val hours = totalSec / 3600
+                            val mins = (totalSec % 3600) / 60
+                            val secs = totalSec % 60
+                            val formattedTime = if (hours > 0) {
+                                String.format("%d:%02d:%02d", hours, mins, secs)
+                            } else {
+                                String.format("%02d:%02d", mins, secs)
+                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -355,21 +364,21 @@ fun LibraryScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color(0xFF262626))
                                     .clickable {
-                                        onPlayBookmark(book, mark.positionMs)
+                                        onPlayBookmark(book, mark)
                                         selectedBookBookmarks = null
                                     }
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = String.format("%02d:%02d", (mark.positionMs / 1000) / 60, (mark.positionMs / 1000) % 60),
+                                    text = formattedTime,
                                     color = Color(0xFFFF5722),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = mark.note ?: "Bookmark",
+                                    text = mark.note?.takeIf { it.isNotBlank() } ?: "Chapter ${mark.trackIndex + 1}",
                                     color = Color.White,
                                     fontSize = 13.sp,
                                     maxLines = 1,

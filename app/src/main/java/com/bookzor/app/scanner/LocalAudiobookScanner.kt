@@ -67,20 +67,39 @@ class LocalAudiobookScanner(
             database.bookDao().setInLibrary(existingBook.infoHash, true)
             database.bookDao().setDownloadRequested(existingBook.infoHash, false)
 
-            // Update track paths so streamServer can find files locally
+            // Update track paths and durations so streamServer and PlayerScreen have accurate metadata
             val existingTracks = database.audioTrackDao().getTracks(existingBook.infoHash)
-            if (existingTracks.isEmpty()) {
+            val needsDurationScan = existingBook.totalDurationMs <= 0L ||
+                existingTracks.isEmpty() ||
+                existingTracks.any { it.durationMs <= 0L }
+
+            if (needsDurationScan) {
+                val mmr = MediaMetadataRetriever()
+                var totalDuration = 0L
                 val trackEntities = audioFiles.mapIndexed { idx, file ->
+                    val existingTrack = existingTracks.getOrNull(idx)
+                    var d = existingTrack?.durationMs ?: 0L
+                    if (d <= 0L) {
+                        try {
+                            mmr.setDataSource(file.absolutePath)
+                            d = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        } catch (_: Exception) {}
+                    }
+                    totalDuration += d
                     AudioTrackEntity(
                         id = "${existingBook.infoHash}_$idx",
                         infoHash = existingBook.infoHash,
                         trackIndex = idx,
                         fileName = file.relativeTo(storageDir).path,
                         fileSizeBytes = file.length(),
-                        durationMs = 0L
+                        durationMs = d
                     )
                 }
+                try { mmr.release() } catch (_: Exception) {}
                 database.audioTrackDao().insertTracks(trackEntities)
+                if (totalDuration > 0L) {
+                    database.bookDao().updateTotalDuration(existingBook.infoHash, totalDuration)
+                }
             }
             return
         }
@@ -117,10 +136,12 @@ class LocalAudiobookScanner(
             }
         } catch (_: Exception) {}
 
-        for (f in audioFiles) {
+        val trackDurations = LongArray(audioFiles.size)
+        for (i in audioFiles.indices) {
             try {
-                mmr.setDataSource(f.absolutePath)
+                mmr.setDataSource(audioFiles[i].absolutePath)
                 val d = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                trackDurations[i] = d
                 totalDuration += d
             } catch (_: Exception) {}
         }
@@ -155,7 +176,7 @@ class LocalAudiobookScanner(
                 trackIndex = idx,
                 fileName = file.relativeTo(storageDir).path,
                 fileSizeBytes = file.length(),
-                durationMs = 0L
+                durationMs = trackDurations[idx]
             )
         }
         database.audioTrackDao().insertTracks(trackEntities)
@@ -171,18 +192,31 @@ class LocalAudiobookScanner(
             database.bookDao().setInLibrary(existingBook.infoHash, true)
             database.bookDao().setDownloadRequested(existingBook.infoHash, false)
 
-            // Ensure track fileName points to this file
+            // Ensure track fileName points to this file and duration is extracted if missing
             val existingTracks = database.audioTrackDao().getTracks(existingBook.infoHash)
-            if (existingTracks.isEmpty()) {
+            val existingDuration = existingTracks.firstOrNull()?.durationMs ?: 0L
+            if (existingTracks.isEmpty() || existingDuration <= 0L || existingBook.totalDurationMs <= 0L) {
+                var duration = maxOf(existingDuration, existingBook.totalDurationMs)
+                if (duration <= 0L) {
+                    val mmr = MediaMetadataRetriever()
+                    try {
+                        mmr.setDataSource(file.absolutePath)
+                        duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    } catch (_: Exception) {}
+                    try { mmr.release() } catch (_: Exception) {}
+                }
                 val track = AudioTrackEntity(
                     id = "${existingBook.infoHash}_0",
                     infoHash = existingBook.infoHash,
                     trackIndex = 0,
                     fileName = file.name,
                     fileSizeBytes = file.length(),
-                    durationMs = 0L
+                    durationMs = duration
                 )
                 database.audioTrackDao().insertTracks(listOf(track))
+                if (duration > 0L) {
+                    database.bookDao().updateTotalDuration(existingBook.infoHash, duration)
+                }
             }
             return
         }

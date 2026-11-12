@@ -1,7 +1,9 @@
 package com.bookzor.feature.player.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -34,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OlegPlayerDeck(
     chapterTitle: String,
@@ -44,6 +48,8 @@ fun OlegPlayerDeck(
     playbackSpeed: Float,
     jumpBackSec: Int = 15,
     jumpForwardSec: Int = 15,
+    bookmarksCount: Int = 0,
+    bookmarkPositionsMs: List<Long> = emptyList(),
     onTogglePlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
     onJumpBack: () -> Unit,
@@ -51,6 +57,7 @@ fun OlegPlayerDeck(
     onNextChapter: () -> Unit,
     onPrevChapter: () -> Unit,
     onBookmark: () -> Unit,
+    onQuickBookmark: () -> Unit = onBookmark,
     onOpenSpeedAndBoost: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -90,6 +97,7 @@ fun OlegPlayerDeck(
             positionMs = positionMs,
             durationMs = durationMs,
             pieces = pieces,
+            bookmarkPositionsMs = bookmarkPositionsMs,
             onSeek = onSeek
         )
 
@@ -204,26 +212,70 @@ fun OlegPlayerDeck(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Bottom Row: Bookmark on bottom-left, Speed on bottom-right
+        // Bottom Row: Bookmark + Quick Bookmark on bottom-left, Speed on bottom-right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Bookmark Flag (Bottom-Left) -> Opens Bookmarks drawer directly!
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    onBookmark()
-                },
-                modifier = Modifier.size(40.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Bookmark,
-                    contentDescription = "Bookmarks",
-                    tint = Color(0xFFFF5722),
-                    modifier = Modifier.size(26.dp)
-                )
+                // Bookmarks List Pill (Bottom-Left) -> Opens Bookmarks drawer, long-press quick-adds
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF222222))
+                        .combinedClickable(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                onBookmark()
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                onQuickBookmark()
+                            }
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "Bookmarks",
+                        tint = Color(0xFFFF5722),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    if (bookmarksCount > 0) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$bookmarksCount",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                // 1-Tap Quick Add Bookmark Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF222222))
+                        .clickable {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onQuickBookmark()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BookmarkAdd,
+                        contentDescription = "Quick Add Bookmark",
+                        tint = Color(0xFFFFB74D),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             // Speed & Equalizer (Bottom-Right)

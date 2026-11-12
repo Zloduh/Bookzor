@@ -86,7 +86,9 @@ fun PlayerScreen(
     onSpeedChange: (Float) -> Unit,
     onBoostChange: (Int) -> Unit,
     onBookmark: () -> Unit,
-    onAddBookmarkWithNote: (String?) -> Unit = {},
+    onSelectBookmark: (BookmarkEntity) -> Unit = { onSeekChapter(it.positionMs) },
+    onAddBookmarkWithNote: (Long, String?) -> Unit = { _, _ -> },
+    onUpdateBookmarkNote: (BookmarkEntity, String?) -> Unit = { _, _ -> },
     onDeleteBookmark: (BookmarkEntity) -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
     onOpenBookDetail: (String) -> Unit = {},
@@ -104,6 +106,18 @@ fun PlayerScreen(
     var jumpForwardSec by remember { mutableIntStateOf(15) }
 
     val hasActiveBook = book != null && book.infoHash.isNotEmpty()
+    val tracksTotalDuration = tracks.sumOf { maxOf(0L, it.durationMs) }
+    val effectiveBookTotalDurationMs = when {
+        (book?.totalDurationMs ?: 0L) > 0L -> book!!.totalDurationMs
+        tracksTotalDuration > 0L -> tracksTotalDuration
+        tracks.size <= 1 && chapterDurationMs > 0L -> chapterDurationMs
+        else -> 0L
+    }
+    val priorTracksElapsedMs = tracks.take(activeTrackIndex).sumOf { maxOf(0L, it.durationMs) }
+    val totalBookElapsedMs = priorTracksElapsedMs + positionMs
+    val activeTrackBookmarkPositions = remember(bookmarks, activeTrackIndex) {
+        bookmarks.filter { it.trackIndex == activeTrackIndex }.map { it.positionMs }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -169,8 +183,8 @@ fun PlayerScreen(
                         // Top Book Metadata Strip
                         OlegBookStrip(
                             book = book,
-                            totalDurationMs = book?.totalDurationMs ?: 0L,
-                            elapsedMs = positionMs,
+                            totalDurationMs = effectiveBookTotalDurationMs,
+                            elapsedMs = totalBookElapsedMs,
                             onOpenLibrary = onOpenBooksLibrary,
                             onSearchQuery = onSearchQuery
                         )
@@ -208,6 +222,8 @@ fun PlayerScreen(
                             playbackSpeed = playbackSpeed,
                             jumpBackSec = jumpBackSec,
                             jumpForwardSec = jumpForwardSec,
+                            bookmarksCount = bookmarks.size,
+                            bookmarkPositionsMs = activeTrackBookmarkPositions,
                             onTogglePlayPause = onTogglePlayPause,
                             onSeek = onSeekChapter,
                             onJumpBack = { onJumpBack(jumpBackSec) },
@@ -215,6 +231,10 @@ fun PlayerScreen(
                             onNextChapter = onNextTrack,
                             onPrevChapter = onPrevTrack,
                             onBookmark = { showBookmarksSheet = true },
+                            onQuickBookmark = {
+                                onBookmark()
+                                scope.launch { snackbarHostState.showSnackbar("Bookmark saved at ${formatDuration(positionMs)}") }
+                            },
                             onOpenSpeedAndBoost = { showSpeedSheet = true }
                         )
                     }
@@ -256,8 +276,8 @@ fun PlayerScreen(
                     // 1. Top Book Strip
                     OlegBookStrip(
                         book = book,
-                        totalDurationMs = book?.totalDurationMs ?: 0L,
-                        elapsedMs = positionMs,
+                        totalDurationMs = effectiveBookTotalDurationMs,
+                        elapsedMs = totalBookElapsedMs,
                         onOpenLibrary = onOpenBooksLibrary,
                         onSearchQuery = onSearchQuery
                     )
@@ -334,6 +354,8 @@ fun PlayerScreen(
                         playbackSpeed = playbackSpeed,
                         jumpBackSec = jumpBackSec,
                         jumpForwardSec = jumpForwardSec,
+                        bookmarksCount = bookmarks.size,
+                        bookmarkPositionsMs = activeTrackBookmarkPositions,
                         onTogglePlayPause = {
                             if (hasActiveBook) onTogglePlayPause() else onOpenBooksLibrary()
                         },
@@ -344,6 +366,14 @@ fun PlayerScreen(
                         onPrevChapter = onPrevTrack,
                         onBookmark = {
                             if (hasActiveBook) showBookmarksSheet = true else onOpenBooksLibrary()
+                        },
+                        onQuickBookmark = {
+                            if (hasActiveBook) {
+                                onBookmark()
+                                scope.launch { snackbarHostState.showSnackbar("Bookmark saved at ${formatDuration(positionMs)}") }
+                            } else {
+                                onOpenBooksLibrary()
+                            }
                         },
                         onOpenSpeedAndBoost = { showSpeedSheet = true }
                     )
@@ -377,13 +407,18 @@ fun PlayerScreen(
         BookmarksBottomSheet(
             bookmarks = bookmarks,
             currentPositionMs = positionMs,
+            tracks = tracks,
             onSelectBookmark = { b ->
-                onSeekChapter(b.positionMs)
+                onSelectBookmark(b)
                 scope.launch { snackbarHostState.showSnackbar("Jumped to bookmark at ${formatDuration(b.positionMs)}") }
             },
-            onAddBookmarkWithNote = { note ->
-                onAddBookmarkWithNote(note)
-                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(positionMs)}") }
+            onAddBookmarkWithNote = { targetPosMs, note ->
+                onAddBookmarkWithNote(targetPosMs, note)
+                scope.launch { snackbarHostState.showSnackbar("Bookmark added at ${formatDuration(targetPosMs)}") }
+            },
+            onUpdateBookmarkNote = { b, updatedNote ->
+                onUpdateBookmarkNote(b, updatedNote)
+                scope.launch { snackbarHostState.showSnackbar("Bookmark updated") }
             },
             onDeleteBookmark = onDeleteBookmark,
             onDismiss = { showBookmarksSheet = false }

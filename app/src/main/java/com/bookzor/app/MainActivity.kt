@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
                     storageDir = torrentEngine.storageDir
                 )
                 scanner.scan()
+                playerController.refreshDurationFromDb()
 
                 // Resume all books marked for offline download in library
                 val libraryBooks = database.bookDao().observeAllBooks()
@@ -105,6 +106,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        if (::playerController.isInitialized) {
+            playerController.saveCurrentState()
+        }
+        super.onStop()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
     }
@@ -143,6 +151,7 @@ class MainActivity : ComponentActivity() {
                         database = database,
                         storageDir = torrentEngine.storageDir
                     ).scan()
+                    playerController.refreshDurationFromDb()
                 } catch (_: Exception) {}
             }
         }
