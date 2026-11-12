@@ -43,7 +43,7 @@
 ### Feature 1: In-App Auto-Updater (`AppUpdateManager.kt`)
 - **User Need:** Update the tablet wirelessly without needing a PC, ADB commands, or USB cables.
 - **Implementation:**
-  - Queries `https://api.github.com/repos/Zloduh/bookzor-releases/releases/latest`.
+  - Queries `https://api.github.com/repos/Zloduh/Bookzor/releases/latest`.
   - Compares versions dynamically (`isVersionNewer`).
   - Downloads APK with live progress indicator (MB and %).
   - Triggers the native Android package installer using `FileProvider`.

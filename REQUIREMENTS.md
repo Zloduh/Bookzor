@@ -14,7 +14,7 @@
 - **Minimum SDK:** Android 8.0 (API Level 26).
 - **Target Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 - **Form Factors:** Android Phones and Tablets (adaptive Compose layouts).
-- **Current App Version:** `1.0.3` (`versionCode = 4`).
+- **Current App Version:** `1.0.4` (`versionCode = 5`).
 
 ---
 
@@ -71,7 +71,7 @@
 
 ### 3.5. In-App Auto-Updater (`app:updater`)
 
-- **FR-UP-01 (GitHub Releases Check):** Query `https://api.github.com/repos/Zloduh/bookzor-releases/releases/latest` on demand in Settings.
+- **FR-UP-01 (GitHub Releases Check):** Query `https://api.github.com/repos/Zloduh/Bookzor/releases/latest` on demand in Settings.
 - **FR-UP-02 (Semantic Version Comparison):** Dynamically compare the latest release tag (e.g. `v1.0.2`) against the installed package version name.
 - **FR-UP-03 (In-App APK Download):** Stream the APK download to app cache with a real-time progress bar, downloaded MB, and total MB display.
 - **FR-UP-04 (Native Package Installation):** Launch the Android system package installer via `FileProvider` (`content://`) with `ACTION_VIEW` and `REQUEST_INSTALL_PACKAGES` permission checking.

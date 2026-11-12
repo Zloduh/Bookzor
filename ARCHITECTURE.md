@@ -121,7 +121,7 @@ AppUpdateManager
        │
        ▼
 1. Query GitHub Releases API:
-   GET https://api.github.com/repos/Zloduh/bookzor-releases/releases/latest
+   GET https://api.github.com/repos/Zloduh/Bookzor/releases/latest
        │
        ▼
 2. Compare Version:

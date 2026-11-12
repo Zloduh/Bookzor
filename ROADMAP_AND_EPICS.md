@@ -407,7 +407,7 @@ This roadmap is designed for **autonomous AI agents** and **junior software engi
 - [x] **Task 10.1.1: Build AppUpdateManager**
   - **Path:** `app/src/main/java/com/bookzor/app/updater/AppUpdateManager.kt`
   - **Details:**
-    - Query GitHub API for latest release on `Zloduh/bookzor-releases`.
+    - Query GitHub API for latest release on `Zloduh/Bookzor`.
     - Compare version names semantically (`isVersionNewer`).
     - Stream APK download to cache directory with progress reporting.
 - [x] **Task 10.1.2: Android Package Installer Integration**
